@@ -15,19 +15,20 @@ import Foundation
 
 struct ContentView: View {
 
+    // ========================================================
+    // MARK: Fixed Current Scenario
+    // ========================================================
+
     @State private var selectedYear = 2026
 
     @State private var growthM2 = 5.0
     @State private var inflationPercent = 3.0
     @State private var taxGrowthPercent = 5.0
     @State private var economicGrowthPercent = 3.0
-
     @State private var stockGrowthPercent = 12.0
     @State private var previousStockGrowthPercent = 20.0
-
     @State private var bondYieldAvgPercent = 4.5
     @State private var growthVolumePercent = 10.0
-
     @State private var crashInterval = 6.0
     @State private var externalShockPercent = 0.0
 
@@ -44,7 +45,10 @@ struct ContentView: View {
         HistoricalMarketEngine()
 
     // ========================================================
-    // MARK: All Crash Results using current scenario parameters but crash years from historical data
+    // MARK: All Crash Results
+    //
+    // Every historical crash year is evaluated using the
+    // current fixed scenario parameters.
     // ========================================================
 
     private var allCrashResults:
@@ -56,18 +60,9 @@ struct ContentView: View {
             .sorted { $0.crashYear < $1.crashYear }
             .map { period in
 
-                let result = engine.analyze(
-                    year: period.crashYear,
-                    growthM2: growthM2,
-                    inflationPercent: inflationPercent,
-                    taxGrowthPercent: taxGrowthPercent,
-                    economicGrowthPercent: economicGrowthPercent,
-                    stockGrowthPercent: stockGrowthPercent,
-                    previousStockGrowthPercent: previousStockGrowthPercent,
-                    bondYieldAvgPercent: bondYieldAvgPercent,
-                    growthVolumePercent: growthVolumePercent,
-                    crashInterval: crashInterval,
-                    externalShockPercent: externalShockPercent
+                let result = historicalEngine.caAnalysis(
+                    for: period,
+                    using: engine
                 )
 
                 return (
@@ -104,7 +99,7 @@ struct ContentView: View {
                     currentScenarioSection
 
                     // ------------------------------------------------
-                    // Historical crash-year panels with current scenario parameters
+                    // Historical crash-year panels
                     // ------------------------------------------------
 
                     VStack(
@@ -112,23 +107,32 @@ struct ContentView: View {
                         spacing: 16
                     ) {
 
-                        Text("Historical Crash-Year Analysis with Current Scenario Parameters")
-                            .font(.title2.bold())
+                        Text(
+                            "Historical Crash-Year Analysis with Current Scenario Parameters"
+                        )
+                        .font(.title2.bold())
 
                         Text(
                             """
-                            Each historical crash year is evaluated using the current scenario inputs 
-                           except the year is replaced by the historical crash year. This allows 
-                            exploration of how current market assumptions would behave at historical 
-                            crash points.
-    """
+                            Each historical crash year is evaluated using the current
+                            scenario inputs except that the year is replaced by the
+                            historical crash year. This allows exploration of how the
+                            model behaves at historical crash points.
+                            """
                         )
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
-                        ForEach(allCrashResults, id: \.period.id) { entry in
+                        ForEach(
+                            allCrashResults,
+                            id: \.period.id
+                        ) { entry in
+
                             historicalCrashPanel(
-                                analysis: historicalEngine.analysis(for: entry.period),
+                                analysis:
+                                    historicalEngine.analysis(
+                                        for: entry.period
+                                    ),
                                 result: entry.result
                             )
                         }
@@ -156,12 +160,13 @@ struct ContentView: View {
                 ) {
 
                     Button {
+
                         runSimulation()
+
                     } label: {
 
                         Image(
-                            systemName:
-                                "arrow.clockwise"
+                            systemName: "arrow.clockwise"
                         )
                     }
                 }
@@ -189,13 +194,9 @@ struct ContentView: View {
                 .font(.title3.bold())
 
             equilibriumCard
-
             energyCard
-
             exhaustionCard
-
             cellularAutomatonCard
-
             riskCard
         }
     }
@@ -246,50 +247,26 @@ struct ContentView: View {
                 )
             }
 
-            // ====================================================
-            // 1. POWER-LAW EQUILIBRIUM
-            // ====================================================
-
             historicalPowerLawCard(
                 analysis: analysis,
                 result: result
             )
 
-            // ====================================================
-            // 2. ENERGY & MOMENTUM
-            // ====================================================
-
             historicalEnergyCard(
                 result: result
             )
-
-            // ====================================================
-            // 3. EXHAUSTION
-            // ====================================================
 
             historicalExhaustionCard(
                 result: result
             )
 
-            // ====================================================
-            // 4. CELLULAR AUTOMATON
-            // ====================================================
-
             historicalCellularAutomatonCard(
                 result: result
             )
 
-            // ====================================================
-            // Risk
-            // ====================================================
-
             historicalRiskCard(
                 result: result
             )
-
-            // ====================================================
-            // Summary
-            // ====================================================
 
             historicalYearSummaryCard(
                 analysis: analysis,
@@ -877,6 +854,9 @@ struct ContentView: View {
 
     // ========================================================
     // MARK: Scenario
+    //
+    // No sliders.
+    // All scenario parameters are fixed model inputs.
     // ========================================================
 
     private var scenarioCard: some View {
@@ -886,84 +866,81 @@ struct ContentView: View {
             spacing: 12
         ) {
 
-            Text("Current Scenario")
-                .font(.headline)
-
-            parameterSlider(
-                "Year",
-                value: $selectedYear,
-                range: 1900...2030,
-                step: 1
+            Text(
+                "Current Scenario"
             )
+            .font(.headline)
 
-            parameterSlider(
+            Text(
+                "Simulation Year: \(selectedYear)"
+            )
+            .font(.subheadline.bold())
+
+            Divider()
+
+            Text(
+                "Model Inputs"
+            )
+            .font(.subheadline.bold())
+
+            scenarioValue(
                 "M2 Growth",
-                value: $growthM2,
-                range: -5...20,
-                step: 0.5
+                value: growthM2,
+                suffix: "%"
             )
 
-            parameterSlider(
+            scenarioValue(
                 "Inflation",
-                value: $inflationPercent,
-                range: -5...15,
-                step: 0.5
+                value: inflationPercent,
+                suffix: "%"
             )
 
-            parameterSlider(
+            scenarioValue(
                 "Tax Growth",
-                value: $taxGrowthPercent,
-                range: -5...20,
-                step: 0.5
+                value: taxGrowthPercent,
+                suffix: "%"
             )
 
-            parameterSlider(
+            scenarioValue(
                 "Economic Growth",
-                value: $economicGrowthPercent,
-                range: -10...15,
-                step: 0.5
+                value: economicGrowthPercent,
+                suffix: "%"
             )
 
-            parameterSlider(
+            scenarioValue(
                 "Stock Growth",
-                value: $stockGrowthPercent,
-                range: -50...100,
-                step: 1
+                value: stockGrowthPercent,
+                suffix: "%"
             )
 
-            parameterSlider(
+            scenarioValue(
                 "Previous Stock Growth",
-                value: $previousStockGrowthPercent,
-                range: -50...100,
-                step: 1
+                value: previousStockGrowthPercent,
+                suffix: "%"
             )
 
-            parameterSlider(
-                "Bond Yield",
-                value: $bondYieldAvgPercent,
-                range: 0...15,
-                step: 0.25
+            scenarioValue(
+                "Average Bond Yield",
+                value: bondYieldAvgPercent,
+                suffix: "%"
             )
 
-            parameterSlider(
+            scenarioValue(
                 "Volume Growth",
-                value: $growthVolumePercent,
-                range: -50...300,
-                step: 5
+                value: growthVolumePercent,
+                suffix: "%"
             )
 
-            parameterSlider(
+            scenarioValue(
                 "Crash Interval",
-                value: $crashInterval,
-                range: 0...25,
-                step: 1
+                value: crashInterval,
+                suffix: " years"
             )
 
-            parameterSlider(
+            scenarioValue(
                 "External Shock",
-                value: $externalShockPercent,
-                range: 0...100,
-                step: 1
+                value: externalShockPercent,
+                suffix: "%"
             )
 
             Button {
@@ -972,10 +949,12 @@ struct ContentView: View {
 
             } label: {
 
-                Text("Run Simulation")
-                    .frame(
-                        maxWidth: .infinity
-                    )
+                Text(
+                    "Run Simulation"
+                )
+                .frame(
+                    maxWidth: .infinity
+                )
             }
             .buttonStyle(
                 .borderedProminent
@@ -988,6 +967,34 @@ struct ContentView: View {
                 cornerRadius: 16
             )
         )
+    }
+
+    // ========================================================
+    // MARK: Scenario Value
+    // ========================================================
+
+    private func scenarioValue(
+        _ title: String,
+        value: Double,
+        suffix: String
+    ) -> some View {
+
+        HStack {
+
+            Text(title)
+
+            Spacer()
+
+            Text(
+                String(
+                    format: "%.1f%@",
+                    value,
+                    suffix
+                )
+            )
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+        }
     }
 
     // ========================================================
@@ -1087,7 +1094,7 @@ struct ContentView: View {
             .font(.headline)
 
             Text(
-                "Each row applies the same historical equilibrium "
+                "Each row applies the historical equilibrium "
                 + "calculation to the years immediately preceding a crash."
             )
             .font(.footnote)
@@ -1661,100 +1668,6 @@ struct ContentView: View {
     }
 
     // ========================================================
-    // MARK: Slider
-    // ========================================================
-
-    @ViewBuilder
-    private func parameterSlider(
-        _ title: String,
-        value: Binding<Double>,
-        range: ClosedRange<Double>,
-        step: Double
-    ) -> some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 4
-        ) {
-
-            HStack {
-
-                Text(title)
-
-                Spacer()
-
-                Text(
-                    String(
-                        format: "%.1f%%",
-                        value.wrappedValue
-                    )
-                )
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-            }
-
-            Slider(
-                value: value,
-                in: range,
-                step: step
-            )
-        }
-    }
-
-    @ViewBuilder
-    private func parameterSlider(
-        _ title: String,
-        value: Binding<Int>,
-        range: ClosedRange<Int>,
-        step: Int
-    ) -> some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 4
-        ) {
-
-            HStack {
-
-                Text(title)
-
-                Spacer()
-
-                Text(
-                    "\(value.wrappedValue)"
-                )
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-            }
-
-            Slider(
-                value:
-                    Binding<Double>(
-                        get: {
-                            Double(
-                                value.wrappedValue
-                            )
-                        },
-                        set: {
-                            value.wrappedValue =
-                                Int(
-                                    $0.rounded()
-                                )
-                        }
-                    ),
-                in:
-                    Double(
-                        range.lowerBound
-                    )...Double(
-                        range.upperBound
-                    ),
-                step:
-                    Double(step)
-            )
-        }
-    }
-
-    // ========================================================
     // MARK: Metric
     // ========================================================
 
@@ -1931,6 +1844,7 @@ struct ContentView: View {
 
         historicalAnalyses =
             historicalEngine.periods.map {
+
                 historicalEngine.analysis(
                     for: $0
                 )
@@ -1964,10 +1878,10 @@ struct ContentView: View {
 }
 
 // ============================================================
-// MARK: - PREVIEW
+// MARK: - Preview
 // ============================================================
 
 #Preview {
-
     ContentView()
 }
+

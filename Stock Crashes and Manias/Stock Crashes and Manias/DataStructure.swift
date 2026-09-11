@@ -7,6 +7,69 @@
 
 import Foundation
 
+struct MarketSimulationResult {
+
+    let year: Int
+
+    // Historical economic pressures
+
+    let moneyPressure: Double
+    let inflationPressure: Double
+    let taxationPressure: Double
+    let economicGrowthPressure: Double
+    let stockGrowthPressure: Double
+    let stockSlowdownPressure: Double
+    let bondPressure: Double
+    let volumePressure: Double
+    let cyclePressure: Double
+    let shockPressure: Double
+
+    // Cellular automaton results
+
+    let meanEnergy: Double
+    let meanMomentum: Double
+    let meanExhaustion: Double
+    let meanStress: Double
+
+    // State distribution
+
+    let criticalFraction: Double
+    let releaseFraction: Double
+
+    // Derived market conditions
+
+    let usefulFuel: Double
+    let overdrivePressure: Double
+    let equilibriumPressure: Double
+    let equilibriumInflection: Double
+    let systemicRisk: Double
+
+    // Final cellular state
+
+    let cells: [MarketCell]
+
+    // MARK: - Risk Classification
+
+    var riskLevel: String {
+        switch systemicRisk {
+        case 0..<0.20:
+            return "Stable"
+
+        case 0.20..<0.40:
+            return "Rising"
+
+        case 0.40..<0.65:
+            return "Stressed"
+
+        case 0.65..<0.85:
+            return "Critical"
+
+        default:
+            return "Crash / Release"
+        }
+    }
+}
+
 
 
 let historicalMarketJSON = """
@@ -664,58 +727,4 @@ struct MarketCell: Identifiable {
     var stress: Double
 
     var state: MarketCellState
-}
-struct MarketSimulationResult {
-
-    let year: Int
-
-    let moneyPressure: Double
-    let inflationPressure: Double
-    let taxationPressure: Double
-
-    let economicGrowthPressure: Double
-    let stockGrowthPressure: Double
-    let stockSlowdownPressure: Double
-
-    let bondPressure: Double
-    let volumePressure: Double
-    let cyclePressure: Double
-    let shockPressure: Double
-
-    let meanEnergy: Double
-    let meanMomentum: Double
-    let meanExhaustion: Double
-    let meanStress: Double
-
-    let criticalFraction: Double
-    let releaseFraction: Double
-
-    let usefulFuel: Double
-    let overdrivePressure: Double
-
-    // IMPORTANT:
-    // This is the historical/model equilibrium measure.
-    let equilibriumPressure: Double
-
-    let equilibriumInflection: Double
-
-    let systemicRisk: Double
-
-    let cells: [MarketCell]
-
-    var riskLevel: String {
-
-        switch systemicRisk {
-        case 0..<0.20:
-            return "LOW"
-        case 0.20..<0.40:
-            return "MODERATE"
-        case 0.40..<0.65:
-            return "ELEVATED"
-        case 0.65..<0.80:
-            return "HIGH"
-        default:
-            return "CRITICAL"
-        }
-    }
 }
