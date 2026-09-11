@@ -9,8 +9,8 @@
 import SwiftUI
 import Foundation
 
-
-
+// ============================================================
+// MARK: Content View
 // ============================================================
 
 struct ContentView: View {
@@ -44,6 +44,41 @@ struct ContentView: View {
         HistoricalMarketEngine()
 
     // ========================================================
+    // MARK: All Crash Results using current scenario parameters but crash years from historical data
+    // ========================================================
+
+    private var allCrashResults:
+        [(period: HistoricalCrashPeriod,
+          result: MarketSimulationResult,
+          cells: [MarketCell])] {
+
+        historicalEngine.periods
+            .sorted { $0.crashYear < $1.crashYear }
+            .map { period in
+
+                let result = engine.analyze(
+                    year: period.crashYear,
+                    growthM2: growthM2,
+                    inflationPercent: inflationPercent,
+                    taxGrowthPercent: taxGrowthPercent,
+                    economicGrowthPercent: economicGrowthPercent,
+                    stockGrowthPercent: stockGrowthPercent,
+                    previousStockGrowthPercent: previousStockGrowthPercent,
+                    bondYieldAvgPercent: bondYieldAvgPercent,
+                    growthVolumePercent: growthVolumePercent,
+                    crashInterval: crashInterval,
+                    externalShockPercent: externalShockPercent
+                )
+
+                return (
+                    period: period,
+                    result: result,
+                    cells: result.cells
+                )
+            }
+    }
+
+    // ========================================================
     // MARK: Body
     // ========================================================
 
@@ -62,17 +97,48 @@ struct ContentView: View {
 
                     scenarioCard
 
-                    equilibriumCard
+                    // ------------------------------------------------
+                    // Current scenario
+                    // ------------------------------------------------
+
+                    currentScenarioSection
+
+                    // ------------------------------------------------
+                    // Historical crash-year panels with current scenario parameters
+                    // ------------------------------------------------
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 16
+                    ) {
+
+                        Text("Historical Crash-Year Analysis with Current Scenario Parameters")
+                            .font(.title2.bold())
+
+                        Text(
+                            """
+                            Each historical crash year is evaluated using the current scenario inputs 
+                           except the year is replaced by the historical crash year. This allows 
+                            exploration of how current market assumptions would behave at historical 
+                            crash points.
+    """
+                        )
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                        ForEach(allCrashResults, id: \.period.id) { entry in
+                            historicalCrashPanel(
+                                analysis: historicalEngine.analysis(for: entry.period),
+                                result: entry.result
+                            )
+                        }
+                    }
+
+                    // ------------------------------------------------
+                    // Historical matrix
+                    // ------------------------------------------------
 
                     historicalMatrixCard
-
-                    energyCard
-
-                    exhaustionCard
-
-                    cellularAutomatonCard
-
-                    riskCard
 
                     modelSummaryCard
 
@@ -92,6 +158,7 @@ struct ContentView: View {
                     Button {
                         runSimulation()
                     } label: {
+
                         Image(
                             systemName:
                                 "arrow.clockwise"
@@ -105,6 +172,666 @@ struct ContentView: View {
                 runSimulation()
             }
         }
+    }
+
+    // ========================================================
+    // MARK: Current Scenario Section
+    // ========================================================
+
+    private var currentScenarioSection: some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+
+            Text("Current Scenario Result")
+                .font(.title3.bold())
+
+            equilibriumCard
+
+            energyCard
+
+            exhaustionCard
+
+            cellularAutomatonCard
+
+            riskCard
+        }
+    }
+
+    // ========================================================
+    // MARK: Historical Crash Panel
+    // ========================================================
+
+    @ViewBuilder
+    private func historicalCrashPanel(
+        analysis: HistoricalAnalysis,
+        result: MarketSimulationResult
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+
+            HStack {
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+
+                    Text(
+                        "Crash Year \(analysis.crashYear)"
+                    )
+                    .font(.title3.bold())
+
+                    Text(
+                        "Model state for crash year \(analysis.crashYear) using current scenario parameters"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text(
+                    percent(
+                        analysis.powerLaw
+                    )
+                )
+                .font(
+                    .headline.monospacedDigit()
+                )
+            }
+
+            // ====================================================
+            // 1. POWER-LAW EQUILIBRIUM
+            // ====================================================
+
+            historicalPowerLawCard(
+                analysis: analysis,
+                result: result
+            )
+
+            // ====================================================
+            // 2. ENERGY & MOMENTUM
+            // ====================================================
+
+            historicalEnergyCard(
+                result: result
+            )
+
+            // ====================================================
+            // 3. EXHAUSTION
+            // ====================================================
+
+            historicalExhaustionCard(
+                result: result
+            )
+
+            // ====================================================
+            // 4. CELLULAR AUTOMATON
+            // ====================================================
+
+            historicalCellularAutomatonCard(
+                result: result
+            )
+
+            // ====================================================
+            // Risk
+            // ====================================================
+
+            historicalRiskCard(
+                result: result
+            )
+
+            // ====================================================
+            // Summary
+            // ====================================================
+
+            historicalYearSummaryCard(
+                analysis: analysis,
+                result: result
+            )
+        }
+        .padding()
+        .background(
+            .thinMaterial,
+            in: RoundedRectangle(
+                cornerRadius: 18
+            )
+        )
+    }
+
+    // ========================================================
+    // MARK: Historical Power Law
+    // ========================================================
+
+    private func historicalPowerLawCard(
+        analysis: HistoricalAnalysis,
+        result: MarketSimulationResult
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+
+            Text(
+                "Power-Law Equilibrium"
+            )
+            .font(.headline)
+
+            HStack {
+
+                metric(
+                    title: "Equilibrium",
+                    value:
+                        percent(
+                            result.equilibriumPressure
+                        )
+                )
+
+                metric(
+                    title: "Inflection",
+                    value:
+                        percent(
+                            result.equilibriumInflection
+                        )
+                )
+
+                metric(
+                    title: "Power Law",
+                    value:
+                        percent(
+                            analysis.powerLaw
+                        )
+                )
+            }
+
+            VStack(
+                alignment: .leading,
+                spacing: 6
+            ) {
+
+                HStack {
+
+                    Text(
+                        "Equilibrium pressure"
+                    )
+
+                    Spacer()
+
+                    Text(
+                        percent(
+                            result.equilibriumPressure
+                        )
+                    )
+                    .monospacedDigit()
+                }
+
+                ProgressView(
+                    value:
+                        max(
+                            0,
+                            min(
+                                1,
+                                result.equilibriumPressure
+                            )
+                        )
+                )
+
+                HStack {
+
+                    Text(
+                        "Momentum inflection"
+                    )
+
+                    Spacer()
+
+                    Text(
+                        percent(
+                            result.equilibriumInflection
+                        )
+                    )
+                    .monospacedDigit()
+                }
+
+                HStack {
+
+                    Text(
+                        "Power-law coefficient"
+                    )
+
+                    Spacer()
+
+                    Text(
+                        percent(
+                            analysis.powerLaw
+                        )
+                    )
+                    .monospacedDigit()
+                }
+            }
+
+            Text(
+                "The power-law value is the historical model's "
+                + "curve parameter associated with the transition "
+                + "from expansion and momentum toward equilibrium. "
+                + "It is a model output, not a probability or a "
+                + "guaranteed crash forecast."
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(
+            Color.secondary.opacity(0.06),
+            in: RoundedRectangle(
+                cornerRadius: 12
+            )
+        )
+    }
+
+    // ========================================================
+    // MARK: Historical Energy
+    // ========================================================
+
+    private func historicalEnergyCard(
+        result: MarketSimulationResult
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+
+            Text(
+                "Energy & Momentum"
+            )
+            .font(.headline)
+
+            HStack {
+
+                metric(
+                    title: "Energy",
+                    value:
+                        percent(
+                            result.meanEnergy
+                        )
+                )
+
+                metric(
+                    title: "Momentum",
+                    value:
+                        percent(
+                            result.meanMomentum
+                        )
+                )
+
+                metric(
+                    title: "Useful Fuel",
+                    value:
+                        percent(
+                            result.usefulFuel
+                        )
+                )
+            }
+
+            Text(
+                "Money-supply expansion is treated as potential "
+                + "fuel. Useful fuel represents the portion of that "
+                + "expansion that remains capable of producing "
+                + "additional market momentum."
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(
+            Color.secondary.opacity(0.06),
+            in: RoundedRectangle(
+                cornerRadius: 12
+            )
+        )
+    }
+
+    // ========================================================
+    // MARK: Historical Exhaustion
+    // ========================================================
+
+    private func historicalExhaustionCard(
+        result: MarketSimulationResult
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+
+            Text(
+                "Exhaustion"
+            )
+            .font(.headline)
+
+            HStack {
+
+                metric(
+                    title: "Internal",
+                    value:
+                        percent(
+                            result.meanExhaustion
+                        )
+                )
+
+                metric(
+                    title: "Stress",
+                    value:
+                        percent(
+                            result.meanStress
+                        )
+                )
+
+                metric(
+                    title: "Overdrive",
+                    value:
+                        percent(
+                            result.overdrivePressure
+                        )
+                )
+            }
+
+            ProgressView(
+                value:
+                    max(
+                        0,
+                        min(
+                            1,
+                            result.meanExhaustion
+                        )
+                    )
+            )
+
+            HStack {
+
+                Text(
+                    "Exhaustion state"
+                )
+
+                Spacer()
+
+                Text(
+                    exhaustionLabel(
+                        result.meanExhaustion
+                    )
+                )
+                .font(.subheadline.bold())
+            }
+
+            Text(
+                "Exhaustion represents declining conversion efficiency "
+                + "inside the expansion. Inflation, taxation pressure, "
+                + "stock-growth slowdown and internal stress can increase "
+                + "the amount of fuel that no longer produces equivalent "
+                + "momentum."
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(
+            Color.secondary.opacity(0.06),
+            in: RoundedRectangle(
+                cornerRadius: 12
+            )
+        )
+    }
+
+    // ========================================================
+    // MARK: Historical Cellular Automaton
+    // ========================================================
+
+    private func historicalCellularAutomatonCard(
+        result: MarketSimulationResult
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+
+            Text(
+                "Cellular Automaton"
+            )
+            .font(.headline)
+
+            Text(
+                "Each cell represents a local market state carrying "
+                + "energy, momentum, equilibrium, exhaustion and stress. "
+                + "Neighboring cells allow local stress and exhaustion "
+                + "to propagate through the modeled market."
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+
+            LazyVGrid(
+                columns:
+                    Array(
+                        repeating:
+                            GridItem(
+                                .flexible(),
+                                spacing: 2
+                            ),
+                        count: 20
+                    ),
+                spacing: 2
+            ) {
+
+                ForEach(
+                    result.cells
+                ) { cell in
+
+                    RoundedRectangle(
+                        cornerRadius: 2
+                    )
+                    .fill(
+                        cellColor(
+                            cell.state
+                        )
+                    )
+                    .aspectRatio(
+                        1,
+                        contentMode: .fit
+                    )
+                }
+            }
+
+            HStack {
+
+                stateLegend(
+                    "Stable",
+                    .gray
+                )
+
+                stateLegend(
+                    "Rising",
+                    .blue
+                )
+
+                stateLegend(
+                    "Stressed",
+                    .orange
+                )
+
+                stateLegend(
+                    "Critical",
+                    .red
+                )
+
+                stateLegend(
+                    "Release",
+                    .purple
+                )
+            }
+            .font(.caption2)
+        }
+        .padding()
+        .background(
+            Color.secondary.opacity(0.06),
+            in: RoundedRectangle(
+                cornerRadius: 12
+            )
+        )
+    }
+
+    // ========================================================
+    // MARK: Historical Risk
+    // ========================================================
+
+    private func historicalRiskCard(
+        result: MarketSimulationResult
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+
+            Text(
+                "Systemic Risk"
+            )
+            .font(.headline)
+
+            HStack {
+
+                Text(
+                    result.riskLevel
+                )
+                .font(.title3.bold())
+                .foregroundStyle(
+                    riskColor(
+                        result.systemicRisk
+                    )
+                )
+
+                Spacer()
+
+                Text(
+                    percent(
+                        result.systemicRisk
+                    )
+                )
+                .font(
+                    .title3.bold()
+                )
+                .monospacedDigit()
+            }
+
+            ProgressView(
+                value:
+                    max(
+                        0,
+                        min(
+                            1,
+                            result.systemicRisk
+                        )
+                    )
+            )
+
+            Text(
+                "The cellular-automaton risk signal is exploratory. "
+                + "It is not a probability that a crash will occur."
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(
+            Color.secondary.opacity(0.06),
+            in: RoundedRectangle(
+                cornerRadius: 12
+            )
+        )
+    }
+
+    // ========================================================
+    // MARK: Historical Year Summary
+    // ========================================================
+
+    private func historicalYearSummaryCard(
+        analysis: HistoricalAnalysis,
+        result: MarketSimulationResult
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+
+            Text(
+                "Crash-Year Model Summary"
+            )
+            .font(.headline)
+
+            Text(
+                "For \(analysis.crashYear), the model combines "
+                + "historical monetary and market expansion with "
+                + "momentum, equilibrium, power-law behavior and "
+                + "cellular exhaustion."
+            )
+
+            Text(
+                "Equilibrium: "
+                + percent(
+                    result.equilibriumPressure
+                )
+                + " • Power law: "
+                + percent(
+                    analysis.powerLaw
+                )
+            )
+
+            Text(
+                "Energy: "
+                + percent(
+                    result.meanEnergy
+                )
+                + " • Momentum: "
+                + percent(
+                    result.meanMomentum
+                )
+                + " • Useful fuel: "
+                + percent(
+                    result.usefulFuel
+                )
+            )
+
+            Text(
+                "Exhaustion: "
+                + percent(
+                    result.meanExhaustion
+                )
+                + " • Stress: "
+                + percent(
+                    result.meanStress
+                )
+                + " • Risk: "
+                + percent(
+                    result.systemicRisk
+                )
+            )
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .padding()
+        .background(
+            Color.secondary.opacity(0.06),
+            in: RoundedRectangle(
+                cornerRadius: 12
+            )
+        )
     }
 
     // ========================================================
@@ -240,7 +967,9 @@ struct ContentView: View {
             )
 
             Button {
+
                 runSimulation()
+
             } label: {
 
                 Text("Run Simulation")
@@ -248,7 +977,9 @@ struct ContentView: View {
                         maxWidth: .infinity
                     )
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(
+                .borderedProminent
+            )
         }
         .padding()
         .background(
@@ -260,7 +991,7 @@ struct ContentView: View {
     }
 
     // ========================================================
-    // MARK: Equilibrium
+    // MARK: Current Equilibrium
     // ========================================================
 
     private var equilibriumCard: some View {
@@ -305,7 +1036,9 @@ struct ContentView: View {
 
             HStack {
 
-                Text("Current equilibrium")
+                Text(
+                    "Current equilibrium"
+                )
 
                 Spacer()
 
@@ -319,7 +1052,13 @@ struct ContentView: View {
 
             ProgressView(
                 value:
-                    result.equilibriumPressure
+                    max(
+                        0,
+                        min(
+                            1,
+                            result.equilibriumPressure
+                        )
+                    )
             )
         }
         .padding()
@@ -547,7 +1286,7 @@ struct ContentView: View {
     }
 
     // ========================================================
-    // MARK: Energy
+    // MARK: Current Energy
     // ========================================================
 
     private var energyCard: some View {
@@ -557,8 +1296,10 @@ struct ContentView: View {
             spacing: 8
         ) {
 
-            Text("Energy & Momentum")
-                .font(.headline)
+            Text(
+                "Energy & Momentum"
+            )
+            .font(.headline)
 
             HStack {
 
@@ -605,7 +1346,7 @@ struct ContentView: View {
     }
 
     // ========================================================
-    // MARK: Exhaustion
+    // MARK: Current Exhaustion
     // ========================================================
 
     private var exhaustionCard: some View {
@@ -615,8 +1356,10 @@ struct ContentView: View {
             spacing: 8
         ) {
 
-            Text("Exhaustion")
-                .font(.headline)
+            Text(
+                "Exhaustion"
+            )
+            .font(.headline)
 
             HStack {
 
@@ -663,7 +1406,7 @@ struct ContentView: View {
     }
 
     // ========================================================
-    // MARK: Cellular Automaton
+    // MARK: Current Cellular Automaton
     // ========================================================
 
     private var cellularAutomatonCard: some View {
@@ -757,7 +1500,7 @@ struct ContentView: View {
     }
 
     // ========================================================
-    // MARK: Risk
+    // MARK: Current Risk
     // ========================================================
 
     private var riskCard: some View {
@@ -796,7 +1539,13 @@ struct ContentView: View {
 
             ProgressView(
                 value:
-                    result.systemicRisk
+                    max(
+                        0,
+                        min(
+                            1,
+                            result.systemicRisk
+                        )
+                    )
             )
 
             Text(
@@ -826,8 +1575,10 @@ struct ContentView: View {
             spacing: 8
         ) {
 
-            Text("Model Summary")
-                .font(.headline)
+            Text(
+                "Model Summary"
+            )
+            .font(.headline)
 
             Text(
                 "1. Money supply growth supplies potential fuel."
@@ -879,8 +1630,10 @@ struct ContentView: View {
             spacing: 8
         ) {
 
-            Text("Disclaimer")
-                .font(.headline)
+            Text(
+                "Disclaimer"
+            )
+            .font(.headline)
 
             Text(
                 "This is an experimental systems-dynamics and "
@@ -984,11 +1737,17 @@ struct ContentView: View {
                         },
                         set: {
                             value.wrappedValue =
-                                Int($0.rounded())
+                                Int(
+                                    $0.rounded()
+                                )
                         }
                     ),
                 in:
-                    Double(range.lowerBound)...Double(range.upperBound),
+                    Double(
+                        range.lowerBound
+                    )...Double(
+                        range.upperBound
+                    ),
                 step:
                     Double(step)
             )
@@ -1089,6 +1848,33 @@ struct ContentView: View {
 
         default:
             return .purple
+        }
+    }
+
+    // ========================================================
+    // MARK: Exhaustion Label
+    // ========================================================
+
+    private func exhaustionLabel(
+        _ value: Double
+    ) -> String {
+
+        switch value {
+
+        case 0..<0.25:
+            return "Low"
+
+        case 0.25..<0.50:
+            return "Building"
+
+        case 0.50..<0.75:
+            return "Elevated"
+
+        case 0.75..<0.90:
+            return "Critical"
+
+        default:
+            return "Extreme"
         }
     }
 

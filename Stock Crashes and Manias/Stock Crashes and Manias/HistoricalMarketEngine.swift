@@ -9,9 +9,6 @@ import Foundation
 
 
 
-
-
-
 final class HistoricalMarketEngine {
 
     private(set) var periods: [HistoricalCrashPeriod] = []
@@ -356,6 +353,99 @@ final class HistoricalMarketEngine {
             equilibrium: equilibrium,
             powerLaw: powerLaw,
             cellularRisk: 0
+        )
+    }
+
+    // --------------------------------------------------------
+    // MARK: Cellular Automaton Analysis (Historical)
+    // --------------------------------------------------------
+    //
+    // Runs the SAME MarketExhaustionEngine cellular automaton
+    // used for the current year against the years leading up
+    // to a historical crash, so energy / momentum / exhaustion /
+    // equilibrium are directly comparable across every event.
+    //
+
+    func caAnalysis(
+        for period: HistoricalCrashPeriod,
+        using engine: MarketExhaustionEngine
+    ) -> MarketSimulationResult {
+
+        let years =
+            period.priorYears.sorted {
+                $0.year < $1.year
+            }
+
+        let growthM2 =
+            average(
+                years.map {
+                    $0.m2GrowthPercent
+                }
+            )
+
+        let inflationPercent =
+            average(
+                years.map {
+                    $0.inflationPercent
+                }
+            )
+
+        let taxGrowthPercent =
+            average(
+                years.map {
+                    $0.taxGrowthPercent
+                }
+            )
+
+        let economicGrowthPercent =
+            average(
+                years.map {
+                    $0.economicGrowthPercent
+                }
+            )
+
+        let bondYieldAvgPercent =
+            average(
+                years.map {
+                    $0.bondYieldAvgPercent
+                }
+            )
+
+        let growthVolumePercent =
+            volumeGrowth(years)
+
+        let interval =
+            crashInterval(
+                for: period.crashYear
+            )
+
+        // The two years closest to the crash carry the
+        // slowdown signal the CA relies on.
+
+        let stockGrowthPercent =
+            years.last?.stockGrowthPercent ?? 0
+
+        let previousStockGrowthPercent =
+            years.count >= 2
+            ? (years[years.count - 2].stockGrowthPercent
+                ?? stockGrowthPercent)
+            : stockGrowthPercent
+
+        return engine.analyze(
+            year: period.crashYear,
+            growthM2: growthM2,
+            inflationPercent: inflationPercent,
+            taxGrowthPercent: taxGrowthPercent,
+            economicGrowthPercent: economicGrowthPercent,
+            stockGrowthPercent: stockGrowthPercent,
+            previousStockGrowthPercent:
+                previousStockGrowthPercent,
+            bondYieldAvgPercent: bondYieldAvgPercent,
+            growthVolumePercent: growthVolumePercent,
+            crashInterval: interval,
+            // No reliable historical shock series is
+            // encoded per-period, so this stays neutral.
+            externalShockPercent: 0
         )
     }
 

@@ -8,6 +8,7 @@
 import Foundation
 
 
+
 let historicalMarketJSON = """
 {
   "crashPeriods": [
@@ -64,7 +65,6 @@ let historicalMarketJSON = """
         }
       ]
     },
-
     {
       "crashYear": 1929,
       "priorYears": [
@@ -90,7 +90,7 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 4.8,
           "economicGrowthPercent": 0.8,
           "stockGrowthPercent": 8.4,
-          "stockVolumeMillions": 1_178.0
+          "stockVolumeMillions": 1178.0
         },
         {
           "year": 1927,
@@ -102,7 +102,7 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 0.8,
           "economicGrowthPercent": 1.9,
           "stockGrowthPercent": 19.9,
-          "stockVolumeMillions": 1_408.0
+          "stockVolumeMillions": 1408.0
         },
         {
           "year": 1928,
@@ -114,11 +114,10 @@ let historicalMarketJSON = """
           "taxGrowthPercent": -3.0,
           "economicGrowthPercent": 4.9,
           "stockGrowthPercent": 43.6,
-          "stockVolumeMillions": 1_693.0
+          "stockVolumeMillions": 1693.0
         }
       ]
     },
-
     {
       "crashYear": 1937,
       "priorYears": [
@@ -172,7 +171,6 @@ let historicalMarketJSON = """
         }
       ]
     },
-
     {
       "crashYear": 1968,
       "priorYears": [
@@ -186,7 +184,7 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 6.8,
           "economicGrowthPercent": 5.8,
           "stockGrowthPercent": 16.5,
-          "stockVolumeMillions": 1_470.0
+          "stockVolumeMillions": 1470.0
         },
         {
           "year": 1965,
@@ -198,7 +196,7 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 6.9,
           "economicGrowthPercent": 6.4,
           "stockGrowthPercent": 12.5,
-          "stockVolumeMillions": 1_680.0
+          "stockVolumeMillions": 1680.0
         },
         {
           "year": 1966,
@@ -210,7 +208,7 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 13.5,
           "economicGrowthPercent": 6.5,
           "stockGrowthPercent": -10.1,
-          "stockVolumeMillions": 1_770.0
+          "stockVolumeMillions": 1770.0
         },
         {
           "year": 1967,
@@ -222,11 +220,10 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 7.5,
           "economicGrowthPercent": 2.5,
           "stockGrowthPercent": 23.9,
-          "stockVolumeMillions": 2_070.0
+          "stockVolumeMillions": 2070.0
         }
       ]
     },
-
     {
       "crashYear": 1974,
       "priorYears": [
@@ -240,7 +237,7 @@ let historicalMarketJSON = """
           "taxGrowthPercent": -2.1,
           "economicGrowthPercent": 0.2,
           "stockGrowthPercent": 4.0,
-          "stockVolumeMillions": 3_540.0
+          "stockVolumeMillions": 3540.0
         },
         {
           "year": 1971,
@@ -252,7 +249,7 @@ let historicalMarketJSON = """
           "taxGrowthPercent": -3.0,
           "economicGrowthPercent": 3.3,
           "stockGrowthPercent": 14.3,
-          "stockVolumeMillions": 3_620.0
+          "stockVolumeMillions": 3620.0
         },
         {
           "year": 1972,
@@ -264,7 +261,7 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 10.8,
           "economicGrowthPercent": 5.3,
           "stockGrowthPercent": 18.9,
-          "stockVolumeMillions": 4_300.0
+          "stockVolumeMillions": 4300.0
         },
         {
           "year": 1973,
@@ -276,17 +273,16 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 11.3,
           "economicGrowthPercent": 5.6,
           "stockGrowthPercent": -14.7,
-          "stockVolumeMillions": 4_500.0
+          "stockVolumeMillions": 4500.0
         }
       ]
     },
-
     {
       "crashYear": 1987,
       "priorYears": [
         {
           "year": 1983,
-          "m2Billions": 1_828.0,
+          "m2Billions": 1828.0,
           "m2GrowthPercent": 9.0,
           "inflationPercent": 3.2,
           "bondYieldAvgPercent": 11.10,
@@ -294,11 +290,11 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 3.3,
           "economicGrowthPercent": 4.6,
           "stockGrowthPercent": 22.6,
-          "stockVolumeMillions": 11_270.0
+          "stockVolumeMillions": 11270.0
         },
         {
           "year": 1984,
-          "m2Billions": 1_962.0,
+          "m2Billions": 1962.0,
           "m2GrowthPercent": 7.3,
           "inflationPercent": 4.3,
           "bondYieldAvgPercent": 12.46,
@@ -306,11 +302,11 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 11.0,
           "economicGrowthPercent": 7.2,
           "stockGrowthPercent": 6.3,
-          "stockVolumeMillions": 13_660.0
+          "stockVolumeMillions": 13660.0
         },
         {
           "year": 1985,
-          "m2Billions": 2_099.0,
+          "m2Billions": 2099.0,
           "m2GrowthPercent": 7.0,
           "inflationPercent": 3.6,
           "bondYieldAvgPercent": 10.62,
@@ -318,11 +314,11 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 10.1,
           "economicGrowthPercent": 4.2,
           "stockGrowthPercent": 31.7,
-          "stockVolumeMillions": 17_590.0
+          "stockVolumeMillions": 17590.0
         },
         {
           "year": 1986,
-          "m2Billions": 2_241.0,
+          "m2Billions": 2241.0,
           "m2GrowthPercent": 6.8,
           "inflationPercent": 1.9,
           "bondYieldAvgPercent": 7.67,
@@ -330,229 +326,226 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 4.8,
           "economicGrowthPercent": 3.5,
           "stockGrowthPercent": 18.4,
-          "stockVolumeMillions": 25_100.0
+          "stockVolumeMillions": 25100.0
         }
       ]
     },
-
     {
       "crashYear": 2000,
       "priorYears": [
         {
           "year": 1996,
-          "m2Billions": 3_845.5,
+          "m2Billions": 3845.5,
           "m2GrowthPercent": 4.7,
           "inflationPercent": 2.9,
           "bondYieldAvgPercent": 6.44,
-          "taxRevenueBillions": 1_453.2,
+          "taxRevenueBillions": 1453.2,
           "taxGrowthPercent": 10.2,
           "economicGrowthPercent": 3.8,
           "stockGrowthPercent": 23.0,
-          "stockVolumeMillions": 105_460.0
+          "stockVolumeMillions": 105460.0
         },
         {
           "year": 1997,
-          "m2Billions": 4_044.0,
+          "m2Billions": 4044.0,
           "m2GrowthPercent": 5.2,
           "inflationPercent": 2.3,
           "bondYieldAvgPercent": 6.35,
-          "taxRevenueBillions": 1_579.0,
+          "taxRevenueBillions": 1579.0,
           "taxGrowthPercent": 8.7,
           "economicGrowthPercent": 4.4,
           "stockGrowthPercent": 33.4,
-          "stockVolumeMillions": 134_620.0
+          "stockVolumeMillions": 134620.0
         },
         {
           "year": 1998,
-          "m2Billions": 4_404.0,
+          "m2Billions": 4404.0,
           "m2GrowthPercent": 8.9,
           "inflationPercent": 1.6,
           "bondYieldAvgPercent": 5.26,
-          "taxRevenueBillions": 1_721.8,
+          "taxRevenueBillions": 1721.8,
           "taxGrowthPercent": 9.0,
           "economicGrowthPercent": 4.5,
           "stockGrowthPercent": 28.6,
-          "stockVolumeMillions": 169_320.0
+          "stockVolumeMillions": 169320.0
         },
         {
           "year": 1999,
-          "m2Billions": 4_600.0,
+          "m2Billions": 4600.0,
           "m2GrowthPercent": 4.5,
           "inflationPercent": 2.2,
           "bondYieldAvgPercent": 5.65,
-          "taxRevenueBillions": 1_827.5,
+          "taxRevenueBillions": 1827.5,
           "taxGrowthPercent": 6.1,
           "economicGrowthPercent": 4.8,
           "stockGrowthPercent": 21.0,
-          "stockVolumeMillions": 203_770.0
+          "stockVolumeMillions": 203770.0
         }
       ]
     },
-
     {
       "crashYear": 2008,
       "priorYears": [
         {
           "year": 2004,
-          "m2Billions": 6_407.0,
+          "m2Billions": 6407.0,
           "m2GrowthPercent": 5.4,
           "inflationPercent": 2.7,
           "bondYieldAvgPercent": 4.27,
-          "taxRevenueBillions": 1_880.1,
+          "taxRevenueBillions": 1880.1,
           "taxGrowthPercent": -5.7,
           "economicGrowthPercent": 3.9,
           "stockGrowthPercent": 10.9,
-          "stockVolumeMillions": 1_099_000.0
+          "stockVolumeMillions": 1099000.0
         },
         {
           "year": 2005,
-          "m2Billions": 6_687.0,
+          "m2Billions": 6687.0,
           "m2GrowthPercent": 4.4,
           "inflationPercent": 3.4,
           "bondYieldAvgPercent": 4.29,
-          "taxRevenueBillions": 2_153.6,
+          "taxRevenueBillions": 2153.6,
           "taxGrowthPercent": 14.5,
           "economicGrowthPercent": 3.5,
           "stockGrowthPercent": 4.9,
-          "stockVolumeMillions": 1_190_000.0
+          "stockVolumeMillions": 1190000.0
         },
         {
           "year": 2006,
-          "m2Billions": 7_013.0,
+          "m2Billions": 7013.0,
           "m2GrowthPercent": 4.9,
           "inflationPercent": 3.2,
           "bondYieldAvgPercent": 4.80,
-          "taxRevenueBillions": 2_406.9,
+          "taxRevenueBillions": 2406.9,
           "taxGrowthPercent": 11.8,
           "economicGrowthPercent": 2.8,
           "stockGrowthPercent": 15.8,
-          "stockVolumeMillions": 1_328_000.0
+          "stockVolumeMillions": 1328000.0
         },
         {
           "year": 2007,
-          "m2Billions": 7_409.0,
+          "m2Billions": 7409.0,
           "m2GrowthPercent": 5.6,
           "inflationPercent": 2.9,
           "bondYieldAvgPercent": 4.63,
-          "taxRevenueBillions": 2_568.0,
+          "taxRevenueBillions": 2568.0,
           "taxGrowthPercent": 6.7,
           "economicGrowthPercent": 2.0,
           "stockGrowthPercent": 5.5,
-          "stockVolumeMillions": 1_487_000.0
+          "stockVolumeMillions": 1487000.0
         }
       ]
     },
-
     {
       "crashYear": 2020,
       "priorYears": [
         {
           "year": 2016,
-          "m2Billions": 13_232.0,
+          "m2Billions": 13232.0,
           "m2GrowthPercent": 6.3,
           "inflationPercent": 1.3,
           "bondYieldAvgPercent": 1.84,
-          "taxRevenueBillions": 3_268.0,
+          "taxRevenueBillions": 3268.0,
           "taxGrowthPercent": 0.6,
           "economicGrowthPercent": 1.8,
           "stockGrowthPercent": 12.0,
-          "stockVolumeMillions": 3_065_000.0
+          "stockVolumeMillions": 3065000.0
         },
         {
           "year": 2017,
-          "m2Billions": 13_896.0,
+          "m2Billions": 13896.0,
           "m2GrowthPercent": 5.0,
           "inflationPercent": 2.1,
           "bondYieldAvgPercent": 2.33,
-          "taxRevenueBillions": 3_316.0,
+          "taxRevenueBillions": 3316.0,
           "taxGrowthPercent": 1.5,
           "economicGrowthPercent": 2.5,
           "stockGrowthPercent": 21.8,
-          "stockVolumeMillions": 3_071_000.0
+          "stockVolumeMillions": 3071000.0
         },
         {
           "year": 2018,
-          "m2Billions": 14_443.0,
+          "m2Billions": 14443.0,
           "m2GrowthPercent": 3.9,
           "inflationPercent": 2.4,
           "bondYieldAvgPercent": 2.91,
-          "taxRevenueBillions": 3_329.0,
+          "taxRevenueBillions": 3329.0,
           "taxGrowthPercent": 0.4,
           "economicGrowthPercent": 3.0,
           "stockGrowthPercent": -4.4,
-          "stockVolumeMillions": 3_189_000.0
+          "stockVolumeMillions": 3189000.0
         },
         {
           "year": 2019,
-          "m2Billions": 15_391.0,
+          "m2Billions": 15391.0,
           "m2GrowthPercent": 6.6,
           "inflationPercent": 1.8,
           "bondYieldAvgPercent": 2.14,
-          "taxRevenueBillions": 3_463.0,
+          "taxRevenueBillions": 3463.0,
           "taxGrowthPercent": 4.0,
           "economicGrowthPercent": 2.6,
           "stockGrowthPercent": 31.5,
-          "stockVolumeMillions": 3_304_000.0
+          "stockVolumeMillions": 3304000.0
         }
       ]
     },
-
     {
       "crashYear": 2022,
       "priorYears": [
         {
           "year": 2018,
-          "m2Billions": 14_443.0,
+          "m2Billions": 14443.0,
           "m2GrowthPercent": 3.9,
           "inflationPercent": 2.4,
           "bondYieldAvgPercent": 2.91,
-          "taxRevenueBillions": 3_329.0,
+          "taxRevenueBillions": 3329.0,
           "taxGrowthPercent": 0.4,
           "economicGrowthPercent": 3.0,
           "stockGrowthPercent": -4.4,
-          "stockVolumeMillions": 3_189_000.0
+          "stockVolumeMillions": 3189000.0
         },
         {
           "year": 2019,
-          "m2Billions": 15_391.0,
+          "m2Billions": 15391.0,
           "m2GrowthPercent": 6.6,
           "inflationPercent": 1.8,
           "bondYieldAvgPercent": 2.14,
-          "taxRevenueBillions": 3_463.0,
+          "taxRevenueBillions": 3463.0,
           "taxGrowthPercent": 4.0,
           "economicGrowthPercent": 2.6,
           "stockGrowthPercent": 31.5,
-          "stockVolumeMillions": 3_304_000.0
+          "stockVolumeMillions": 3304000.0
         },
         {
           "year": 2020,
-          "m2Billions": 17_733.0,
+          "m2Billions": 17733.0,
           "m2GrowthPercent": 15.2,
           "inflationPercent": 1.2,
           "bondYieldAvgPercent": 0.89,
-          "taxRevenueBillions": 3_421.0,
+          "taxRevenueBillions": 3421.0,
           "taxGrowthPercent": -1.2,
           "economicGrowthPercent": -2.2,
           "stockGrowthPercent": 18.4,
-          "stockVolumeMillions": 4_189_000.0
+          "stockVolumeMillions": 4189000.0
         },
         {
           "year": 2021,
-          "m2Billions": 21_186.0,
+          "m2Billions": 21186.0,
           "m2GrowthPercent": 19.5,
           "inflationPercent": 4.7,
           "bondYieldAvgPercent": 1.45,
-          "taxRevenueBillions": 4_047.1,
+          "taxRevenueBillions": 4047.1,
           "taxGrowthPercent": 18.3,
           "economicGrowthPercent": 5.8,
           "stockGrowthPercent": 28.7,
-          "stockVolumeMillions": 4_646_000.0
+          "stockVolumeMillions": 4646000.0
         }
       ]
     }
   ]
 }
 """
+
 
 // ============================================================
 // MARK: - JSON MODELS

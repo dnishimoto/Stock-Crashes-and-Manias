@@ -1,5 +1,7 @@
+
+
 //
-//  File.swift
+//  MarketExhaustionEngine.swift
 //  Stock Crashes and Manias
 //
 //  Created by David Nishimoto on 9/10/26.
@@ -8,7 +10,6 @@
 import Foundation
 import SwiftUI
 
-
 final class MarketExhaustionEngine {
 
     let gridWidth: Int
@@ -16,12 +17,29 @@ final class MarketExhaustionEngine {
 
     private(set) var cells: [MarketCell] = []
 
+    // --------------------------------------------------------
+    // MARK: Thresholds
+    // --------------------------------------------------------
+
     private let risingThreshold = 0.20
     private let stressedThreshold = 0.40
-    private let criticalThreshold = 0.65
-    private let releaseThreshold = 0.85
 
+    // IMPORTANT:
+    // This is a STRESS threshold.
+    // It is NOT an exhaustion value.
+    private let criticalStressThreshold = 0.65
+
+    // Stress at or above this level represents a release/crash
+    // condition when combined with the energy condition below.
+    private let releaseStressThreshold = 0.85
+
+    // Energy below this level represents very low stored
+    // market potential.
     private let energyReleaseThreshold = 0.08
+
+    // --------------------------------------------------------
+    // MARK: Model Weights
+    // --------------------------------------------------------
 
     private let inflationWeight = 0.35
     private let taxationWeight = 0.15
@@ -30,8 +48,14 @@ final class MarketExhaustionEngine {
     private let contagionAmplifier = 0.75
     private let intervalAmplifier = 0.15
 
-    init(gridWidth: Int = 20, gridHeight: Int = 12) {
+    // --------------------------------------------------------
+    // MARK: Initialization
+    // --------------------------------------------------------
 
+    init(
+        gridWidth: Int = 20,
+        gridHeight: Int = 12
+    ) {
         self.gridWidth = max(1, gridWidth)
         self.gridHeight = max(1, gridHeight)
 
@@ -66,13 +90,24 @@ final class MarketExhaustionEngine {
         )
     }
 
+    // --------------------------------------------------------
+    // MARK: Clamp
+    // --------------------------------------------------------
+
     private func clamp(
         _ value: Double,
         _ lower: Double = 0,
         _ upper: Double = 1
     ) -> Double {
 
-        min(upper, max(lower, value))
+        guard value.isFinite else {
+            return lower
+        }
+
+        return min(
+            upper,
+            max(lower, value)
+        )
     }
 
     // --------------------------------------------------------
@@ -87,7 +122,8 @@ final class MarketExhaustionEngine {
 
         for index in 0..<count {
 
-            let x = Double(index % gridWidth) /
+            let x =
+                Double(index % gridWidth) /
                 Double(max(1, gridWidth - 1))
 
             let initialMomentum =
@@ -97,19 +133,34 @@ final class MarketExhaustionEngine {
             cells.append(
                 MarketCell(
                     id: index,
+
                     energy: 0.85,
+
                     momentum: initialMomentum,
+
                     momentumChange: 0,
+
                     equilibrium: 0,
+
                     equilibriumInflection: 0,
+
                     inflationExhaustion: 0,
+
                     taxationExhaustion: 0,
+
                     stockGrowthExhaustion: 0,
+
                     contagionExhaustion: 0,
+
                     intervalExhaustion: 0,
+
                     internalExhaustion: 0,
+
+                    // Actual exhaustion begins at zero.
                     exhaustion: 0,
+
                     stress: 0,
+
                     state: .stable
                 )
             )
@@ -120,7 +171,9 @@ final class MarketExhaustionEngine {
     // MARK: Neighbor Topology
     // --------------------------------------------------------
 
-    private func neighborIndices(for index: Int) -> [Int] {
+    private func neighborIndices(
+        for index: Int
+    ) -> [Int] {
 
         let x = index % gridWidth
         let y = index / gridWidth
@@ -138,10 +191,11 @@ final class MarketExhaustionEngine {
                 let nx = x + dx
                 let ny = y + dy
 
-                guard nx >= 0,
-                      nx < gridWidth,
-                      ny >= 0,
-                      ny < gridHeight
+                guard
+                    nx >= 0,
+                    nx < gridWidth,
+                    ny >= 0,
+                    ny < gridHeight
                 else {
                     continue
                 }
@@ -164,24 +218,35 @@ final class MarketExhaustionEngine {
         stress: Double
     ) -> MarketCellState {
 
+        // Crash/release condition.
+        //
+        // Very low energy OR very high stress represents
+        // a release condition.
         if energy <= energyReleaseThreshold ||
-            stress >= releaseThreshold {
+            stress >= releaseStressThreshold {
 
             return .crash
         }
 
+        // Normal/stable condition.
         if stress < risingThreshold {
             return .stable
         }
 
+        // Market pressure is increasing.
         if stress < stressedThreshold {
             return .rising
         }
 
-        if stress < criticalThreshold {
+        // Market is materially stressed.
+        if stress < criticalStressThreshold {
             return .stressed
         }
 
+        // IMPORTANT:
+        // 65% here refers ONLY to STRESS.
+        //
+        // It does NOT set exhaustion to 65%.
         return .critical
     }
 
@@ -204,12 +269,13 @@ final class MarketExhaustionEngine {
         shockPressure: Double
     ) -> MarketCell {
 
-        // ========================================================
+        // ====================================================
         // 1. EXHAUSTION CHANNELS
-        // ========================================================
+        // ====================================================
 
         let inflationExhaustion = normalize(
-            inflationPressure * (1.0 + 0.60 * moneyPressure),
+            inflationPressure *
+            (1.0 + 0.60 * moneyPressure),
             lowerBound: 0.0,
             upperBound: 1.60
         )
@@ -226,74 +292,70 @@ final class MarketExhaustionEngine {
             1.0
         )
 
-
-        // ========================================================
+        // ====================================================
         // 2. INTERNAL EXHAUSTION
-        // ========================================================
+        // ====================================================
 
         let internalExhaustion = clamp(
-            0.35 * inflationExhaustion +
-            0.15 * taxationExhaustion +
-            0.50 * stockGrowthExhaustion,
+            inflationWeight * inflationExhaustion +
+            taxationWeight * taxationExhaustion +
+            stockSlowdownWeight * stockGrowthExhaustion,
             0.0,
             1.0
         )
 
-
-        // ========================================================
+        // ====================================================
         // 3. INTERVAL PRESSURE
-        // ========================================================
-        //
-        // Crash interval remains deliberately weak.
-        //
+        // ====================================================
 
         let intervalExhaustion = clamp(
-            0.15 * cyclePressure,
+            intervalAmplifier * cyclePressure,
             0.0,
-            0.15
+            intervalAmplifier
         )
 
-
-        // ========================================================
+        // ====================================================
         // 4. SYSTEMIC AMPLIFICATION
-        // ========================================================
+        // ====================================================
 
         let systemicAmplification =
             1.0 +
-            0.75 * clamp(contagion, 0.0, 1.0) +
+            contagionAmplifier *
+            clamp(contagion, 0.0, 1.0) +
             intervalExhaustion
 
-
-        // ========================================================
+        // ====================================================
         // 5. MARKET FUEL
-        // ========================================================
+        // ====================================================
         //
         // Money growth provides the primary fuel.
-        // Economic growth determines how effectively that fuel
-        // can become productive momentum.
         //
+        // Economic growth determines how effectively
+        // monetary fuel becomes productive momentum.
+        //
+        // ====================================================
 
         let fuel = clamp(
             moneyPressure *
-            (0.50 + 0.50 * economicGrowthPressure),
+            (
+                0.50 +
+                0.50 * economicGrowthPressure
+            ),
             0.0,
             1.0
         )
 
-
-        // ========================================================
+        // ====================================================
         // 6. MOMENTUM DRIVE
-        // ========================================================
+        // ====================================================
         //
         // Momentum is driven by:
         //
-        //   35% monetary fuel
-        //   25% stock growth
-        //   15% economic growth
+        // 35% monetary fuel
+        // 25% stock growth
+        // 15% economic growth
         //
-        // This prevents momentum from being generated solely
-        // from the exhaustion mechanism.
-        //
+        // ====================================================
 
         let momentumDrive = clamp(
             0.35 * fuel +
@@ -303,10 +365,9 @@ final class MarketExhaustionEngine {
             1.0
         )
 
-
-        // ========================================================
+        // ====================================================
         // 7. EQUILIBRIUM PRESSURE
-        // ========================================================
+        // ====================================================
 
         let equilibriumPressure = clamp(
             0.45 * stockSlowdownPressure +
@@ -319,14 +380,14 @@ final class MarketExhaustionEngine {
             1.0
         )
 
-
-        // ========================================================
+        // ====================================================
         // 8. EQUILIBRIUM INFLECTION
-        // ========================================================
+        // ====================================================
         //
-        // Positive value means equilibrium pressure is beginning
-        // to overcome the forces increasing momentum.
+        // Positive value means equilibrium pressure is
+        // beginning to overcome forces increasing momentum.
         //
+        // ====================================================
 
         let equilibriumInflection = normalize(
             equilibriumPressure - momentumDrive,
@@ -334,10 +395,9 @@ final class MarketExhaustionEngine {
             upperBound: 1.0
         )
 
-
-        // ========================================================
+        // ====================================================
         // 9. BASE EXHAUSTION
-        // ========================================================
+        // ====================================================
 
         let baseExhaustion = clamp(
             internalExhaustion +
@@ -347,14 +407,21 @@ final class MarketExhaustionEngine {
             1.0
         )
 
-
-        // ========================================================
+        // ====================================================
         // 10. TOTAL EXHAUSTION
-        // ========================================================
+        // ====================================================
+        //
+        // THIS IS THE ACTUAL EXHAUSTION VALUE.
+        //
+        // It is independent of the 65% critical-stress
+        // threshold.
+        //
+        // ====================================================
 
         let totalExhaustion = clamp(
             (
-                baseExhaustion * systemicAmplification
+                baseExhaustion *
+                systemicAmplification
             ) +
             0.10 * bondPressure +
             0.10 * volumePressure +
@@ -363,13 +430,9 @@ final class MarketExhaustionEngine {
             1.0
         )
 
-
-        // ========================================================
+        // ====================================================
         // 11. USEFUL FUEL
-        // ========================================================
-        //
-        // Fuel becomes less useful as the cell becomes exhausted.
-        //
+        // ====================================================
 
         let usefulFuel = clamp(
             fuel *
@@ -379,20 +442,9 @@ final class MarketExhaustionEngine {
             1.0
         )
 
-
-        // ========================================================
+        // ====================================================
         // 12. MOMENTUM UPDATE
-        // ========================================================
-        //
-        // Before equilibrium:
-        //     momentum can grow.
-        //
-        // At equilibrium:
-        //     growth begins to turn.
-        //
-        // After equilibrium:
-        //     exhaustion reduces momentum.
-        //
+        // ====================================================
 
         let momentumGain =
             0.20 * momentumDrive +
@@ -410,16 +462,9 @@ final class MarketExhaustionEngine {
             1.0
         )
 
-
-        // ========================================================
+        // ====================================================
         // 13. ENERGY UPDATE
-        // ========================================================
-        //
-        // Energy is stored market potential.
-        //
-        // Useful economic activity replenishes it.
-        // Exhaustion consumes it.
-        //
+        // ====================================================
 
         let energyRecovery =
             0.10 * usefulFuel
@@ -435,10 +480,15 @@ final class MarketExhaustionEngine {
             1.0
         )
 
-
-        // ========================================================
+        // ====================================================
         // 14. STRESS
-        // ========================================================
+        // ====================================================
+        //
+        // Stress is intentionally separate from exhaustion.
+        //
+        // 65% is a stress threshold.
+        //
+        // ====================================================
 
         let nextStress = clamp(
             0.40 * totalExhaustion +
@@ -451,91 +501,77 @@ final class MarketExhaustionEngine {
             1.0
         )
 
-
-        // ========================================================
+        // ====================================================
         // 15. MARKET STATE
-        // ========================================================
+        // ====================================================
+        //
+        // State is determined from energy and stress.
+        //
+        // It does NOT overwrite exhaustion.
+        //
+        // ====================================================
 
-        let nextState: MarketCellState
+        let nextState = stateFor(
+            energy: nextEnergy,
+            stress: nextStress
+        )
 
-        if nextEnergy <= energyReleaseThreshold &&
-            nextStress >= releaseThreshold {
-
-            nextState = .crash
-
-        } else if nextStress >= criticalThreshold {
-
-            nextState = .critical
-
-        } else if nextStress >= stressedThreshold {
-
-            nextState = .stressed
-
-        } else if nextMomentum > current.momentum {
-
-            nextState = .rising
-
-        } else {
-
-            nextState = .stable
-        }
-
-
-        // ========================================================
+        // ====================================================
         // 16. RETURN CELL
-        // ========================================================
+        // ====================================================
 
         return MarketCell(
             id: current.id,
+
             energy: nextEnergy,
+
             momentum: nextMomentum,
-            momentumChange: nextMomentum - current.momentum,
-            equilibrium: equilibriumPressure,
-            equilibriumInflection: equilibriumInflection,
-            inflationExhaustion: inflationExhaustion,
-            taxationExhaustion: taxationExhaustion,
-            stockGrowthExhaustion: stockGrowthExhaustion,
-            contagionExhaustion: contagion,
-            intervalExhaustion: intervalExhaustion,
-            internalExhaustion: internalExhaustion,
-            exhaustion: totalExhaustion,
-            stress: nextStress,
-            state: nextState
+
+            momentumChange:
+                nextMomentum -
+                current.momentum,
+
+            equilibrium:
+                equilibriumPressure,
+
+            equilibriumInflection:
+                equilibriumInflection,
+
+            inflationExhaustion:
+                inflationExhaustion,
+
+            taxationExhaustion:
+                taxationExhaustion,
+
+            stockGrowthExhaustion:
+                stockGrowthExhaustion,
+
+            contagionExhaustion:
+                contagion,
+
+            intervalExhaustion:
+                intervalExhaustion,
+
+            internalExhaustion:
+                internalExhaustion,
+
+            // THIS is the actual exhaustion.
+            exhaustion:
+                totalExhaustion,
+
+            // This is separate from exhaustion.
+            stress:
+                nextStress,
+
+            state:
+                nextState
         )
-
     }
-    private func neighborIndices(of index: Int) -> [Int] {
-        // Your cellular automaton is a 20 × 12 grid.
-        let gridWidth = 20
-        let gridHeight = 12
 
-        let x = index % gridWidth
-        let y = index / gridWidth
+    // --------------------------------------------------------
+    // MARK: Run
+    // --------------------------------------------------------
 
-        var indices: [Int] = []
-
-        for dy in -1...1 {
-            for dx in -1...1 {
-                if dx == 0 && dy == 0 {
-                    continue
-                }
-
-                let nx = x + dx
-                let ny = y + dy
-
-                guard nx >= 0,
-                      nx < gridWidth,
-                      ny >= 0,
-                      ny < gridHeight else {
-                    continue
-                }
-
-                indices.append(ny * gridWidth + nx)
-            }
-        }
-
-        return indices
-    }
     func run(
         generations: Int = 20,
         moneyPressure: Double,
@@ -549,15 +585,17 @@ final class MarketExhaustionEngine {
         cyclePressure: Double,
         shockPressure: Double
     ) {
+
         reset()
 
         for _ in 0..<max(1, generations) {
 
-            // Snapshot of the current generation.
-            // Every cell must calculate its next state from the
-            // same previous generation.
-            let currentCells = cells
+            // Snapshot the current generation.
+            //
+            // Every cell calculates its next state from
+            // the same previous generation.
 
+            let currentCells = cells
             var nextCells = currentCells
 
             for index in currentCells.indices {
@@ -566,7 +604,10 @@ final class MarketExhaustionEngine {
                 // Neighbor topology
                 // ------------------------------------------------
 
-                let neighborIndices = self.neighborIndices(for: index)
+                let neighborIndices =
+                    self.neighborIndices(
+                        for: index
+                    )
 
                 // ------------------------------------------------
                 // Neighbor exhaustion
@@ -575,13 +616,23 @@ final class MarketExhaustionEngine {
                 let neighborExhaustion: Double
 
                 if neighborIndices.isEmpty {
+
                     neighborExhaustion = 0.0
+
                 } else {
+
                     neighborExhaustion =
-                        neighborIndices.reduce(0.0) { total, neighborIndex in
-                            total + currentCells[neighborIndex].exhaustion
-                        }
-                        / Double(neighborIndices.count)
+                        neighborIndices.reduce(0.0) {
+                            total,
+                            neighborIndex in
+
+                            total +
+                            currentCells[
+                                neighborIndex
+                            ].exhaustion
+
+                        } /
+                        Double(neighborIndices.count)
                 }
 
                 // ------------------------------------------------
@@ -591,17 +642,38 @@ final class MarketExhaustionEngine {
                 let neighborStress: Double
 
                 if neighborIndices.isEmpty {
+
                     neighborStress = 0.0
+
                 } else {
+
                     neighborStress =
-                        neighborIndices.reduce(0.0) { total, neighborIndex in
-                            total + currentCells[neighborIndex].stress
-                        }
-                        / Double(neighborIndices.count)
+                        neighborIndices.reduce(0.0) {
+                            total,
+                            neighborIndex in
+
+                            total +
+                            currentCells[
+                                neighborIndex
+                            ].stress
+
+                        } /
+                        Double(neighborIndices.count)
                 }
 
                 // ------------------------------------------------
                 // Contagion
+                // ------------------------------------------------
+                //
+                // 65% of contagion comes from neighboring
+                // exhaustion.
+                //
+                // 35% comes from neighboring stress.
+                //
+                // NOTE:
+                // This 0.65 is a weighting factor.
+                // It is NOT a 65% exhaustion threshold.
+                //
                 // ------------------------------------------------
 
                 let contagion = clamp(
@@ -617,24 +689,49 @@ final class MarketExhaustionEngine {
 
                 nextCells[index] = step(
                     currentCells[index],
-                    contagion: contagion,
-                    moneyPressure: moneyPressure,
-                    inflationPressure: inflationPressure,
-                    taxationPressure: taxationPressure,
-                    economicGrowthPressure: economicGrowthPressure,
-                    stockGrowthPressure: stockGrowthPressure,
-                    stockSlowdownPressure: stockSlowdownPressure,
-                    bondPressure: bondPressure,
-                    volumePressure: volumePressure,
-                    cyclePressure: cyclePressure,
-                    shockPressure: shockPressure
+
+                    contagion:
+                        contagion,
+
+                    moneyPressure:
+                        moneyPressure,
+
+                    inflationPressure:
+                        inflationPressure,
+
+                    taxationPressure:
+                        taxationPressure,
+
+                    economicGrowthPressure:
+                        economicGrowthPressure,
+
+                    stockGrowthPressure:
+                        stockGrowthPressure,
+
+                    stockSlowdownPressure:
+                        stockSlowdownPressure,
+
+                    bondPressure:
+                        bondPressure,
+
+                    volumePressure:
+                        volumePressure,
+
+                    cyclePressure:
+                        cyclePressure,
+
+                    shockPressure:
+                        shockPressure
                 )
             }
 
-            // Advance the entire cellular automaton simultaneously.
+            // Advance the entire cellular automaton
+            // simultaneously.
+
             cells = nextCells
         }
     }
+
     // --------------------------------------------------------
     // MARK: Analyze
     // --------------------------------------------------------
@@ -652,6 +749,10 @@ final class MarketExhaustionEngine {
         crashInterval: Double,
         externalShockPercent: Double
     ) -> MarketSimulationResult {
+
+        // ====================================================
+        // 1. NORMALIZED INPUT PRESSURES
+        // ====================================================
 
         let moneyPressure =
             normalize(
@@ -692,6 +793,10 @@ final class MarketExhaustionEngine {
                 upperBound: 100
             )
 
+        // ====================================================
+        // 2. STOCK MOMENTUM CHANGE
+        // ====================================================
+
         let momentumChange =
             stockGrowthPercent -
             previousStockGrowthPercent
@@ -703,12 +808,20 @@ final class MarketExhaustionEngine {
                 upperBound: 30
             )
 
+        // ====================================================
+        // 3. BOND PRESSURE
+        // ====================================================
+
         let bondPressure =
             normalize(
                 bondYieldAvgPercent,
                 lowerBound: 0,
                 upperBound: 15
             )
+
+        // ====================================================
+        // 4. VOLUME PRESSURE
+        // ====================================================
 
         let volumePressure =
             normalize(
@@ -717,12 +830,20 @@ final class MarketExhaustionEngine {
                 upperBound: 300
             )
 
+        // ====================================================
+        // 5. CYCLE PRESSURE
+        // ====================================================
+
         let cyclePressure =
             normalize(
                 crashInterval,
                 lowerBound: 0,
                 upperBound: 25
             )
+
+        // ====================================================
+        // 6. EXTERNAL SHOCK
+        // ====================================================
 
         let shockPressure =
             normalize(
@@ -731,19 +852,47 @@ final class MarketExhaustionEngine {
                 upperBound: 100
             )
 
+        // ====================================================
+        // 7. RUN CELLULAR SIMULATION
+        // ====================================================
+
         run(
             generations: 20,
-            moneyPressure: moneyPressure,
-            inflationPressure: inflationPressure,
-            taxationPressure: taxationPressure,
-            economicGrowthPressure: economicGrowthPressure,
-            stockGrowthPressure: stockGrowthPressure,
-            stockSlowdownPressure: stockSlowdownPressure,
-            bondPressure: bondPressure,
-            volumePressure: volumePressure,
-            cyclePressure: cyclePressure,
-            shockPressure: shockPressure
+
+            moneyPressure:
+                moneyPressure,
+
+            inflationPressure:
+                inflationPressure,
+
+            taxationPressure:
+                taxationPressure,
+
+            economicGrowthPressure:
+                economicGrowthPressure,
+
+            stockGrowthPressure:
+                stockGrowthPressure,
+
+            stockSlowdownPressure:
+                stockSlowdownPressure,
+
+            bondPressure:
+                bondPressure,
+
+            volumePressure:
+                volumePressure,
+
+            cyclePressure:
+                cyclePressure,
+
+            shockPressure:
+                shockPressure
         )
+
+        // ====================================================
+        // 8. FINAL CELL STATISTICS
+        // ====================================================
 
         let meanEnergy =
             mean(\.energy)
@@ -751,11 +900,30 @@ final class MarketExhaustionEngine {
         let meanMomentum =
             mean(\.momentum)
 
+        // IMPORTANT:
+        //
+        // This is the actual calculated mean exhaustion.
+        //
+        // It is NOT the 0.65 critical stress threshold.
+
         let meanExhaustion =
             mean(\.exhaustion)
 
         let meanStress =
             mean(\.stress)
+
+        // ====================================================
+        // 9. CRITICAL FRACTION
+        // ====================================================
+        //
+        // Fraction of cells whose STATE is critical.
+        //
+        // A critical cell has stress >= 65%.
+        //
+        // This does NOT mean every critical cell has
+        // exhaustion = 65%.
+        //
+        // ====================================================
 
         let criticalFraction =
             fraction(
@@ -764,6 +932,10 @@ final class MarketExhaustionEngine {
                 }
             )
 
+        // ====================================================
+        // 10. RELEASE FRACTION
+        // ====================================================
+
         let releaseFraction =
             fraction(
                 where: {
@@ -771,12 +943,20 @@ final class MarketExhaustionEngine {
                 }
             )
 
+        // ====================================================
+        // 11. USEFUL FUEL
+        // ====================================================
+
         let usefulFuel =
             clamp(
                 moneyPressure *
                 meanEnergy *
-                (1 - meanExhaustion)
+                (1.0 - meanExhaustion)
             )
+
+        // ====================================================
+        // 12. OVERDRIVE PRESSURE
+        // ====================================================
 
         let overdrivePressure =
             clamp(
@@ -784,11 +964,30 @@ final class MarketExhaustionEngine {
                 inflationPressure
             )
 
+        // ====================================================
+        // 13. EQUILIBRIUM
+        // ====================================================
+
         let equilibriumPressure =
             mean(\.equilibrium)
 
         let equilibriumInflection =
             mean(\.equilibriumInflection)
+
+        // ====================================================
+        // 14. SYSTEMIC RISK
+        // ====================================================
+        //
+        // Systemic risk is a separate composite measure.
+        //
+        // It uses actual exhaustion, actual stress,
+        // critical-cell fraction, crash-cell fraction,
+        // energy depletion, stock slowdown, inflation,
+        // and external shock.
+        //
+        // It is NOT hardcoded to 65%.
+        //
+        // ====================================================
 
         let systemicRisk =
             clamp(
@@ -796,36 +995,90 @@ final class MarketExhaustionEngine {
                 0.20 * meanStress +
                 0.15 * criticalFraction +
                 0.10 * releaseFraction +
-                0.10 * (1 - meanEnergy) +
+                0.10 * (1.0 - meanEnergy) +
                 0.10 * stockSlowdownPressure +
                 0.10 * inflationPressure +
                 0.05 * shockPressure
             )
 
+        // ====================================================
+        // 15. RETURN RESULT
+        // ====================================================
+
         return MarketSimulationResult(
-            year: year,
-            moneyPressure: moneyPressure,
-            inflationPressure: inflationPressure,
-            taxationPressure: taxationPressure,
-            economicGrowthPressure: economicGrowthPressure,
-            stockGrowthPressure: stockGrowthPressure,
-            stockSlowdownPressure: stockSlowdownPressure,
-            bondPressure: bondPressure,
-            volumePressure: volumePressure,
-            cyclePressure: cyclePressure,
-            shockPressure: shockPressure,
-            meanEnergy: meanEnergy,
-            meanMomentum: meanMomentum,
-            meanExhaustion: meanExhaustion,
-            meanStress: meanStress,
-            criticalFraction: criticalFraction,
-            releaseFraction: releaseFraction,
-            usefulFuel: usefulFuel,
-            overdrivePressure: overdrivePressure,
-            equilibriumPressure: equilibriumPressure,
-            equilibriumInflection: equilibriumInflection,
-            systemicRisk: systemicRisk,
-            cells: cells
+
+            year:
+                year,
+
+            moneyPressure:
+                moneyPressure,
+
+            inflationPressure:
+                inflationPressure,
+
+            taxationPressure:
+                taxationPressure,
+
+            economicGrowthPressure:
+                economicGrowthPressure,
+
+            stockGrowthPressure:
+                stockGrowthPressure,
+
+            stockSlowdownPressure:
+                stockSlowdownPressure,
+
+            bondPressure:
+                bondPressure,
+
+            volumePressure:
+                volumePressure,
+
+            cyclePressure:
+                cyclePressure,
+
+            shockPressure:
+                shockPressure,
+
+            meanEnergy:
+                meanEnergy,
+
+            meanMomentum:
+                meanMomentum,
+
+            // ACTUAL exhaustion result.
+            meanExhaustion:
+                meanExhaustion,
+
+            // Separate stress result.
+            meanStress:
+                meanStress,
+
+            // Percentage of cells classified critical.
+            criticalFraction:
+                criticalFraction,
+
+            // Percentage of cells classified crash.
+            releaseFraction:
+                releaseFraction,
+
+            usefulFuel:
+                usefulFuel,
+
+            overdrivePressure:
+                overdrivePressure,
+
+            equilibriumPressure:
+                equilibriumPressure,
+
+            equilibriumInflection:
+                equilibriumInflection,
+
+            systemicRisk:
+                systemicRisk,
+
+            cells:
+                cells
         )
     }
 
@@ -842,8 +1095,11 @@ final class MarketExhaustionEngine {
         }
 
         return cells
-            .map { $0[keyPath: keyPath] }
-            .reduce(0, +) /
+            .map {
+                $0[keyPath: keyPath]
+            }
+            .reduce(0, +)
+            /
             Double(cells.count)
     }
 
