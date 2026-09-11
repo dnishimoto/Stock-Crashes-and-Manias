@@ -153,6 +153,14 @@ final class HistoricalMarketEngine {
                 }
             )
 
+        let moneyPolicyChangeImpact = average(
+            period.priorYears.compactMap(\.moneyPolicyChangeImpact)
+        )
+        
+        let bankingCreditStressRating = average(
+            period.priorYears.compactMap(\.bankingCreditStressRating)
+        )
+        
         let inflation =
             average(
                 years.map {
@@ -336,6 +344,8 @@ final class HistoricalMarketEngine {
                 (0.65 + 0.35 * equilibrium)
             )
 
+
+        
         return HistoricalAnalysis(
             crashYear: period.crashYear,
             priorYearsUsed: years.count,
@@ -346,13 +356,15 @@ final class HistoricalMarketEngine {
             economicGrowth: economicGrowth,
             stockGrowth: stockGrowth,
             stockVolumeGrowth: stockVolumeGrowth,
+            moneyPolicyChangeImpact: moneyPolicyChangeImpact,
             crashInterval: interval,
             optimism: optimism,
             momentum: momentum,
             momentumTurn: momentumTurn,
             equilibrium: equilibrium,
             powerLaw: powerLaw,
-            cellularRisk: 0
+            cellularRisk: 0,
+            bankingCreditStressRating: bankingCreditStressRating
         )
     }
 
@@ -431,9 +443,21 @@ final class HistoricalMarketEngine {
                 ?? stockGrowthPercent)
             : stockGrowthPercent
 
+        let moneyPolicyChangeImpact = average(
+            period.priorYears.compactMap(\.moneyPolicyChangeImpact)
+        )
+        let bankingCreditStressRating = average(
+            years.map {
+                $0.bankingCreditStressRating
+            }
+        )
+
+
         return engine.analyze(
             year: period.crashYear,
             growthM2: growthM2,
+            moneyPolicyChangeImpact: moneyPolicyChangeImpact,
+            bankingCreditStressRating: bankingCreditStressRating,
             inflationPercent: inflationPercent,
             taxGrowthPercent: taxGrowthPercent,
             economicGrowthPercent: economicGrowthPercent,
@@ -443,8 +467,6 @@ final class HistoricalMarketEngine {
             bondYieldAvgPercent: bondYieldAvgPercent,
             growthVolumePercent: growthVolumePercent,
             crashInterval: interval,
-            // No reliable historical shock series is
-            // encoded per-period, so this stays neutral.
             externalShockPercent: 0
         )
     }

@@ -6,7 +6,142 @@
 //
 
 import Foundation
+import SwiftUI
 
+struct HistoricalCAInput: Identifiable {
+
+    let id: UUID
+    let year: Int
+
+    let growthM2: Double
+
+    /// -10 = strongly contractionary
+    ///  0  = neutral
+    /// +10 = strongly expansionary
+    ///
+    /// The current CA uses the magnitude of the intervention
+    /// as an exhaustion pressure.
+    let moneyPolicyChangeImpact: Double
+    let bankingCreditStressRating : Double
+
+    let inflationPercent: Double
+    let taxGrowthPercent: Double
+    let economicGrowthPercent: Double
+
+    let stockGrowthPercent: Double
+    let previousStockGrowthPercent: Double
+
+    let bondYieldAvgPercent: Double
+
+    /// Year-over-year trading-volume change.
+    ///
+    /// This is NOT the raw stock-volume level.
+    let growthVolumePercent: Double
+
+    let crashInterval: Double
+    let externalShockPercent: Double
+
+
+    init(
+        year: Int,
+        growthM2: Double,
+        moneyPolicyChangeImpact: Double = 0,
+        bankingCreditStressRating: Double = 1,
+        inflationPercent: Double,
+        taxGrowthPercent: Double,
+        economicGrowthPercent: Double,
+        stockGrowthPercent: Double,
+        previousStockGrowthPercent: Double,
+        bondYieldAvgPercent: Double,
+        growthVolumePercent: Double,
+        crashInterval: Double,
+        externalShockPercent: Double = 0
+    ) {
+        self.id = UUID()
+
+        self.year = year
+
+        self.growthM2 = growthM2
+
+        self.moneyPolicyChangeImpact = min(
+            max(moneyPolicyChangeImpact, -10),
+            10
+        )
+
+        self.inflationPercent = inflationPercent
+        self.taxGrowthPercent = taxGrowthPercent
+        self.economicGrowthPercent = economicGrowthPercent
+
+        self.stockGrowthPercent = stockGrowthPercent
+        self.previousStockGrowthPercent =
+            previousStockGrowthPercent
+
+        self.bondYieldAvgPercent =
+            bondYieldAvgPercent
+
+        self.growthVolumePercent =
+            growthVolumePercent
+
+        self.crashInterval =
+            crashInterval
+
+        self.externalShockPercent =
+            externalShockPercent
+        
+        self.bankingCreditStressRating=bankingCreditStressRating
+    }
+}
+struct HistoricalCAFrame: Identifiable {
+
+    let id: UUID
+
+    let year: Int
+    let isCrashYear: Bool
+
+    let moneyEnergyChange: Double
+    let volumePressure: Double
+
+    let meanEnergy: Double
+    let meanMomentum: Double
+    let meanExhaustion: Double
+    let meanStress: Double
+
+    let cells: [MarketCell]
+
+    init(
+        year: Int,
+        isCrashYear: Bool,
+        moneyEnergyChange: Double,
+        volumePressure: Double,
+        cells: [MarketCell]
+    ) {
+        self.id = UUID()
+
+        self.year = year
+        self.isCrashYear = isCrashYear
+
+        self.moneyEnergyChange = moneyEnergyChange
+        self.volumePressure = volumePressure
+
+        self.cells = cells
+
+        self.meanEnergy = MarketExhaustionEngine.mean(
+            cells.map(\.energy)
+        )
+
+        self.meanMomentum = MarketExhaustionEngine.mean(
+            cells.map(\.momentum)
+        )
+
+        self.meanExhaustion = MarketExhaustionEngine.mean(
+            cells.map(\.exhaustion)
+        )
+
+        self.meanStress = MarketExhaustionEngine.mean(
+            cells.map(\.stress)
+        )
+    }
+}
 struct MarketSimulationResult {
 
     let year: Int
@@ -73,6 +208,7 @@ struct MarketSimulationResult {
 
 
 let historicalMarketJSON = """
+
 {
   "crashPeriods": [
     {
@@ -80,8 +216,10 @@ let historicalMarketJSON = """
       "priorYears": [
         {
           "year": 1903,
+          "bankingCreditStressRating": 2.0,
           "m2Billions": 9.6,
           "m2GrowthPercent": 7.9,
+          "moneyPolicyChangeImpact": 4,
           "inflationPercent": 2.3,
           "bondYieldAvgPercent": 3.42,
           "taxRevenueBillions": 0.233,
@@ -92,8 +230,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1904,
+          "bankingCreditStressRating": 3.0,
           "m2Billions": 9.4,
           "m2GrowthPercent": -2.1,
+          "moneyPolicyChangeImpact": -6,
           "inflationPercent": 1.0,
           "bondYieldAvgPercent": 3.55,
           "taxRevenueBillions": 0.262,
@@ -104,8 +244,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1905,
+          "bankingCreditStressRating": 3.0,
           "m2Billions": 10.5,
           "m2GrowthPercent": 11.7,
+          "moneyPolicyChangeImpact": 5,
           "inflationPercent": 0.0,
           "bondYieldAvgPercent": 3.47,
           "taxRevenueBillions": 0.262,
@@ -116,8 +258,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1906,
+          "bankingCreditStressRating": 6.0,
           "m2Billions": 11.0,
           "m2GrowthPercent": 4.8,
+          "moneyPolicyChangeImpact": -7,
           "inflationPercent": 1.0,
           "bondYieldAvgPercent": 3.52,
           "taxRevenueBillions": 0.300,
@@ -128,13 +272,16 @@ let historicalMarketJSON = """
         }
       ]
     },
+
     {
       "crashYear": 1929,
       "priorYears": [
         {
           "year": 1925,
+          "bankingCreditStressRating": 2.0,
           "m2Billions": 45.8,
           "m2GrowthPercent": 4.1,
+          "moneyPolicyChangeImpact": 3,
           "inflationPercent": 2.4,
           "bondYieldAvgPercent": 3.61,
           "taxRevenueBillions": 3.780,
@@ -145,8 +292,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1926,
+          "bankingCreditStressRating": 2.0,
           "m2Billions": 48.5,
           "m2GrowthPercent": 5.9,
+          "moneyPolicyChangeImpact": 4,
           "inflationPercent": 1.0,
           "bondYieldAvgPercent": 3.67,
           "taxRevenueBillions": 3.962,
@@ -157,8 +306,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1927,
+          "bankingCreditStressRating": 3.0,
           "m2Billions": 51.5,
           "m2GrowthPercent": 6.2,
+          "moneyPolicyChangeImpact": 5,
           "inflationPercent": -1.9,
           "bondYieldAvgPercent": 3.51,
           "taxRevenueBillions": 3.992,
@@ -169,8 +320,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1928,
+          "bankingCreditStressRating": 5.0,
           "m2Billions": 53.0,
           "m2GrowthPercent": 2.9,
+          "moneyPolicyChangeImpact": -6,
           "inflationPercent": -1.2,
           "bondYieldAvgPercent": 3.66,
           "taxRevenueBillions": 3.872,
@@ -181,13 +334,16 @@ let historicalMarketJSON = """
         }
       ]
     },
+
     {
       "crashYear": 1937,
       "priorYears": [
         {
           "year": 1933,
+          "bankingCreditStressRating": 7.0,
           "m2Billions": 32.2,
           "m2GrowthPercent": 3.2,
+          "moneyPolicyChangeImpact": 8,
           "inflationPercent": -5.1,
           "bondYieldAvgPercent": 3.53,
           "taxRevenueBillions": 2.080,
@@ -198,8 +354,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1934,
+          "bankingCreditStressRating": 6.0,
           "m2Billions": 35.8,
           "m2GrowthPercent": 11.2,
+          "moneyPolicyChangeImpact": 7,
           "inflationPercent": 3.5,
           "bondYieldAvgPercent": 3.29,
           "taxRevenueBillions": 3.116,
@@ -210,8 +368,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1935,
+          "bankingCreditStressRating": 4.0,
           "m2Billions": 39.5,
           "m2GrowthPercent": 10.3,
+          "moneyPolicyChangeImpact": 6,
           "inflationPercent": 2.6,
           "bondYieldAvgPercent": 2.84,
           "taxRevenueBillions": 3.800,
@@ -222,8 +382,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1936,
+          "bankingCreditStressRating": 6.0,
           "m2Billions": 43.1,
           "m2GrowthPercent": 9.1,
+          "moneyPolicyChangeImpact": -6,
           "inflationPercent": 1.0,
           "bondYieldAvgPercent": 2.65,
           "taxRevenueBillions": 4.116,
@@ -234,13 +396,16 @@ let historicalMarketJSON = """
         }
       ]
     },
+
     {
       "crashYear": 1968,
       "priorYears": [
         {
           "year": 1964,
+          "bankingCreditStressRating": 2.0,
           "m2Billions": 168.1,
           "m2GrowthPercent": 4.7,
+          "moneyPolicyChangeImpact": 3,
           "inflationPercent": 1.3,
           "bondYieldAvgPercent": 4.19,
           "taxRevenueBillions": 91.8,
@@ -251,8 +416,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1965,
+          "bankingCreditStressRating": 2.0,
           "m2Billions": 180.2,
           "m2GrowthPercent": 7.2,
+          "moneyPolicyChangeImpact": 4,
           "inflationPercent": 1.6,
           "bondYieldAvgPercent": 4.21,
           "taxRevenueBillions": 98.1,
@@ -263,8 +430,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1966,
+          "bankingCreditStressRating": 5.0,
           "m2Billions": 188.7,
           "m2GrowthPercent": 4.7,
+          "moneyPolicyChangeImpact": -7,
           "inflationPercent": 2.9,
           "bondYieldAvgPercent": 4.65,
           "taxRevenueBillions": 111.3,
@@ -275,8 +444,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1967,
+          "bankingCreditStressRating": 6.0,
           "m2Billions": 203.1,
           "m2GrowthPercent": 7.6,
+          "moneyPolicyChangeImpact": -6,
           "inflationPercent": 2.8,
           "bondYieldAvgPercent": 4.86,
           "taxRevenueBillions": 119.6,
@@ -287,13 +458,16 @@ let historicalMarketJSON = """
         }
       ]
     },
+
     {
       "crashYear": 1974,
       "priorYears": [
         {
           "year": 1970,
+          "bankingCreditStressRating": 3.0,
           "m2Billions": 233.2,
           "m2GrowthPercent": 5.6,
+          "moneyPolicyChangeImpact": -6,
           "inflationPercent": 5.8,
           "bondYieldAvgPercent": 6.04,
           "taxRevenueBillions": 192.8,
@@ -304,8 +478,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1971,
+          "bankingCreditStressRating": 2.0,
           "m2Billions": 249.1,
           "m2GrowthPercent": 6.8,
+          "moneyPolicyChangeImpact": 6,
           "inflationPercent": 4.3,
           "bondYieldAvgPercent": 6.21,
           "taxRevenueBillions": 187.1,
@@ -316,8 +492,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1972,
+          "bankingCreditStressRating": 3.0,
           "m2Billions": 268.1,
           "m2GrowthPercent": 7.6,
+          "moneyPolicyChangeImpact": 7,
           "inflationPercent": 3.3,
           "bondYieldAvgPercent": 6.70,
           "taxRevenueBillions": 207.3,
@@ -328,8 +506,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1973,
+          "bankingCreditStressRating": 6.0,
           "m2Billions": 292.0,
           "m2GrowthPercent": 8.9,
+          "moneyPolicyChangeImpact": -8,
           "inflationPercent": 6.2,
           "bondYieldAvgPercent": 7.00,
           "taxRevenueBillions": 230.8,
@@ -340,13 +520,16 @@ let historicalMarketJSON = """
         }
       ]
     },
+
     {
       "crashYear": 1987,
       "priorYears": [
         {
           "year": 1983,
+          "bankingCreditStressRating": 2.0,
           "m2Billions": 1828.0,
           "m2GrowthPercent": 9.0,
+          "moneyPolicyChangeImpact": 4,
           "inflationPercent": 3.2,
           "bondYieldAvgPercent": 11.10,
           "taxRevenueBillions": 600.6,
@@ -357,8 +540,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1984,
+          "bankingCreditStressRating": 3.0,
           "m2Billions": 1962.0,
           "m2GrowthPercent": 7.3,
+          "moneyPolicyChangeImpact": 5,
           "inflationPercent": 4.3,
           "bondYieldAvgPercent": 12.46,
           "taxRevenueBillions": 666.5,
@@ -369,8 +554,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1985,
+          "bankingCreditStressRating": 2.0,
           "m2Billions": 2099.0,
           "m2GrowthPercent": 7.0,
+          "moneyPolicyChangeImpact": 5,
           "inflationPercent": 3.6,
           "bondYieldAvgPercent": 10.62,
           "taxRevenueBillions": 734.1,
@@ -381,8 +568,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1986,
+          "bankingCreditStressRating": 4.0,
           "m2Billions": 2241.0,
           "m2GrowthPercent": 6.8,
+          "moneyPolicyChangeImpact": -7,
           "inflationPercent": 1.9,
           "bondYieldAvgPercent": 7.67,
           "taxRevenueBillions": 769.2,
@@ -393,13 +582,16 @@ let historicalMarketJSON = """
         }
       ]
     },
+
     {
       "crashYear": 2000,
       "priorYears": [
         {
           "year": 1996,
+          "bankingCreditStressRating": 1.0,
           "m2Billions": 3845.5,
           "m2GrowthPercent": 4.7,
+          "moneyPolicyChangeImpact": 3,
           "inflationPercent": 2.9,
           "bondYieldAvgPercent": 6.44,
           "taxRevenueBillions": 1453.2,
@@ -410,8 +602,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1997,
+          "bankingCreditStressRating": 1.0,
           "m2Billions": 4044.0,
           "m2GrowthPercent": 5.2,
+          "moneyPolicyChangeImpact": 4,
           "inflationPercent": 2.3,
           "bondYieldAvgPercent": 6.35,
           "taxRevenueBillions": 1579.0,
@@ -422,8 +616,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1998,
+          "bankingCreditStressRating": 2.0,
           "m2Billions": 4404.0,
           "m2GrowthPercent": 8.9,
+          "moneyPolicyChangeImpact": 6,
           "inflationPercent": 1.6,
           "bondYieldAvgPercent": 5.26,
           "taxRevenueBillions": 1721.8,
@@ -434,8 +630,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 1999,
+          "bankingCreditStressRating": 3.0,
           "m2Billions": 4600.0,
           "m2GrowthPercent": 4.5,
+          "moneyPolicyChangeImpact": -7,
           "inflationPercent": 2.2,
           "bondYieldAvgPercent": 5.65,
           "taxRevenueBillions": 1827.5,
@@ -446,13 +644,16 @@ let historicalMarketJSON = """
         }
       ]
     },
+
     {
       "crashYear": 2008,
       "priorYears": [
         {
           "year": 2004,
+          "bankingCreditStressRating": 2.0,
           "m2Billions": 6407.0,
           "m2GrowthPercent": 5.4,
+          "moneyPolicyChangeImpact": 4,
           "inflationPercent": 2.7,
           "bondYieldAvgPercent": 4.27,
           "taxRevenueBillions": 1880.1,
@@ -463,8 +664,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 2005,
+          "bankingCreditStressRating": 3.0,
           "m2Billions": 6687.0,
           "m2GrowthPercent": 4.4,
+          "moneyPolicyChangeImpact": 5,
           "inflationPercent": 3.4,
           "bondYieldAvgPercent": 4.29,
           "taxRevenueBillions": 2153.6,
@@ -475,8 +678,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 2006,
+          "bankingCreditStressRating": 6.0,
           "m2Billions": 7013.0,
           "m2GrowthPercent": 4.9,
+          "moneyPolicyChangeImpact": 6,
           "inflationPercent": 3.2,
           "bondYieldAvgPercent": 4.80,
           "taxRevenueBillions": 2406.9,
@@ -487,8 +692,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 2007,
+          "bankingCreditStressRating": 9.0,
           "m2Billions": 7409.0,
           "m2GrowthPercent": 5.6,
+          "moneyPolicyChangeImpact": -8,
           "inflationPercent": 2.9,
           "bondYieldAvgPercent": 4.63,
           "taxRevenueBillions": 2568.0,
@@ -499,13 +706,16 @@ let historicalMarketJSON = """
         }
       ]
     },
+
     {
       "crashYear": 2020,
       "priorYears": [
         {
           "year": 2016,
+          "bankingCreditStressRating": 2.0,
           "m2Billions": 13232.0,
           "m2GrowthPercent": 6.3,
+          "moneyPolicyChangeImpact": 4,
           "inflationPercent": 1.3,
           "bondYieldAvgPercent": 1.84,
           "taxRevenueBillions": 3268.0,
@@ -516,8 +726,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 2017,
+          "bankingCreditStressRating": 2.0,
           "m2Billions": 13896.0,
           "m2GrowthPercent": 5.0,
+          "moneyPolicyChangeImpact": 4,
           "inflationPercent": 2.1,
           "bondYieldAvgPercent": 2.33,
           "taxRevenueBillions": 3316.0,
@@ -528,8 +740,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 2018,
+          "bankingCreditStressRating": 3.0,
           "m2Billions": 14443.0,
           "m2GrowthPercent": 3.9,
+          "moneyPolicyChangeImpact": -6,
           "inflationPercent": 2.4,
           "bondYieldAvgPercent": 2.91,
           "taxRevenueBillions": 3329.0,
@@ -540,8 +754,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 2019,
+          "bankingCreditStressRating": 5.0,
           "m2Billions": 15391.0,
           "m2GrowthPercent": 6.6,
+          "moneyPolicyChangeImpact": 7,
           "inflationPercent": 1.8,
           "bondYieldAvgPercent": 2.14,
           "taxRevenueBillions": 3463.0,
@@ -552,13 +768,16 @@ let historicalMarketJSON = """
         }
       ]
     },
+
     {
       "crashYear": 2022,
       "priorYears": [
         {
           "year": 2018,
+          "bankingCreditStressRating": 2.0,
           "m2Billions": 14443.0,
           "m2GrowthPercent": 3.9,
+          "moneyPolicyChangeImpact": -6,
           "inflationPercent": 2.4,
           "bondYieldAvgPercent": 2.91,
           "taxRevenueBillions": 3329.0,
@@ -569,8 +788,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 2019,
+          "bankingCreditStressRating": 3.0,
           "m2Billions": 15391.0,
           "m2GrowthPercent": 6.6,
+          "moneyPolicyChangeImpact": 7,
           "inflationPercent": 1.8,
           "bondYieldAvgPercent": 2.14,
           "taxRevenueBillions": 3463.0,
@@ -581,8 +802,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 2020,
+          "bankingCreditStressRating": 8.0,
           "m2Billions": 17733.0,
           "m2GrowthPercent": 15.2,
+          "moneyPolicyChangeImpact": 10,
           "inflationPercent": 1.2,
           "bondYieldAvgPercent": 0.89,
           "taxRevenueBillions": 3421.0,
@@ -593,8 +816,10 @@ let historicalMarketJSON = """
         },
         {
           "year": 2021,
+          "bankingCreditStressRating": 7.0,
           "m2Billions": 21186.0,
           "m2GrowthPercent": 19.5,
+          "moneyPolicyChangeImpact": 10,
           "inflationPercent": 4.7,
           "bondYieldAvgPercent": 1.45,
           "taxRevenueBillions": 4047.1,
@@ -632,6 +857,8 @@ struct HistoricalYear: Codable, Identifiable {
 
     let m2Billions: Double?
     let m2GrowthPercent: Double?
+    let moneyPolicyChangeImpact : Double?
+    let bankingCreditStressRating: Double?
     let inflationPercent: Double?
     let bondYieldAvgPercent: Double?
 
@@ -662,7 +889,7 @@ struct HistoricalAnalysis: Identifiable {
     let economicGrowth: Double
     let stockGrowth: Double
     let stockVolumeGrowth: Double
-
+    let moneyPolicyChangeImpact: Double
     let crashInterval: Double
 
     let optimism: Double
@@ -673,6 +900,7 @@ struct HistoricalAnalysis: Identifiable {
     let powerLaw: Double
 
     let cellularRisk: Double
+    let bankingCreditStressRating : Double
 }
 
 // ============================================================
@@ -705,7 +933,7 @@ enum MarketCellState: String {
 
 struct MarketCell: Identifiable {
 
-    let id: Int
+    let id: UUID
 
     var energy: Double
     var momentum: Double

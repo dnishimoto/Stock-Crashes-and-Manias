@@ -22,6 +22,8 @@ struct ContentView: View {
     @State private var selectedYear = 2026
 
     @State private var growthM2 = 5.0
+    @State private var moneyPolicyChangeImpact = 0.62
+    @State private var bankingCreditStressRating = 2.0
     @State private var inflationPercent = 3.0
     @State private var taxGrowthPercent = 5.0
     @State private var economicGrowthPercent = 3.0
@@ -51,10 +53,23 @@ struct ContentView: View {
     // current fixed scenario parameters.
     // ========================================================
 
+    // ========================================================
+    // MARK: All Crash Results
+    //
+    // Every historical crash year is evaluated using the
+    // current fixed scenario parameters.
+    //
+    // Each result also captures the complete cellular-automaton
+    // history leading into that crash year.
+    // ========================================================
+
     private var allCrashResults:
-        [(period: HistoricalCrashPeriod,
-          result: MarketSimulationResult,
-          cells: [MarketCell])] {
+        [(
+            period: HistoricalCrashPeriod,
+            result: MarketSimulationResult,
+            cells: [MarketCell],
+            historicalFrames: [HistoricalCAFrame]
+        )] {
 
         historicalEngine.periods
             .sorted { $0.crashYear < $1.crashYear }
@@ -65,10 +80,17 @@ struct ContentView: View {
                     using: engine
                 )
 
+                // IMPORTANT:
+                // caAnalysis() leaves the engine containing the
+                // historical CA sequence. Capture it now before
+                // the engine is reused for the next crash period.
+                let frames = engine.historicalFrames
+
                 return (
                     period: period,
                     result: result,
-                    cells: result.cells
+                    cells: result.cells,
+                    historicalFrames: frames
                 )
             }
     }
@@ -127,7 +149,6 @@ struct ContentView: View {
                             allCrashResults,
                             id: \.period.id
                         ) { entry in
-
                             historicalCrashPanel(
                                 analysis:
                                     historicalEngine.analysis(
@@ -146,7 +167,7 @@ struct ContentView: View {
 
                     modelSummaryCard
 
-                    disclaimerCard
+                    //.disclaimerCard
                 }
                 .padding()
             }
@@ -1815,6 +1836,8 @@ struct ContentView: View {
             engine.analyze(
                 year: selectedYear,
                 growthM2: growthM2,
+                moneyPolicyChangeImpact: moneyPolicyChangeImpact,
+                bankingCreditStressRating : bankingCreditStressRating,
                 inflationPercent:
                     inflationPercent,
                 taxGrowthPercent:
@@ -1864,6 +1887,8 @@ struct ContentView: View {
         return engine.analyze(
             year: 2026,
             growthM2: 5,
+            moneyPolicyChangeImpact: 0.60,
+            bankingCreditStressRating : 2.0,
             inflationPercent: 3,
             taxGrowthPercent: 5,
             economicGrowthPercent: 3,
