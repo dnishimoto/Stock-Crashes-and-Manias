@@ -434,7 +434,7 @@ struct ContentView: View {
     // ========================================================
 
     private func historicalEnergyCard(
-        result: MarketSimulationResult
+        result: HistoricalCAResult
     ) -> some View {
 
         VStack(
@@ -523,7 +523,7 @@ struct ContentView: View {
     // ========================================================
 
     private func historicalExhaustionCard(
-        result: MarketSimulationResult
+        result: HistoricalCAResult
     ) -> some View {
 
         VStack(
@@ -629,7 +629,7 @@ struct ContentView: View {
     // ========================================================
 
     private func historicalCellularAutomatonCard(
-        result: MarketSimulationResult
+        result: HistoricalCAResult
     ) -> some View {
 
         VStack(
@@ -727,7 +727,7 @@ struct ContentView: View {
     // ========================================================
 
     private func historicalRiskCard(
-        result: MarketSimulationResult
+        result: HistoricalCAResult
     ) -> some View {
 
         VStack(
@@ -851,7 +851,7 @@ struct ContentView: View {
 
     private func historicalYearSummaryCard(
         analysis: HistoricalAnalysis,
-        result: MarketSimulationResult
+        result: HistoricalCAResult
     ) -> some View {
 
         VStack(
@@ -872,44 +872,20 @@ struct ContentView: View {
             )
 
             Text(
-                "Equilibrium: "
-                + percent(
-                    result.equilibriumPressure
-                )
-                + " • Power law: "
-                + percent(
-                    analysis.powerLaw
-                )
+                "Equilibrium: \(percent(result.equilibriumPressure)) • "
+                + "Power law: \(percent(analysis.powerLaw))"
             )
 
             Text(
-                "Energy: "
-                + percent(
-                    result.meanEnergy
-                )
-                + " • Momentum: "
-                + percent(
-                    result.meanMomentum
-                )
-                + " • Useful fuel: "
-                + percent(
-                    result.usefulFuel
-                )
+                "Energy: \(percent(result.meanEnergy)) • "
+                + "Momentum: \(percent(result.meanMomentum)) • "
+                + "Useful fuel: \(percent(result.usefulFuel))"
             )
 
             Text(
-                "Exhaustion: "
-                + percent(
-                    result.meanExhaustion
-                )
-                + " • Stress: "
-                + percent(
-                    result.meanStress
-                )
-                + " • Risk: "
-                + percent(
-                    result.systemicRisk
-                )
+                "Exhaustion: \(percent(result.meanExhaustion)) • "
+                + "Stress: \(percent(result.meanStress)) • "
+                + "Risk: \(percent(result.systemicRisk))"
             )
         }
         .font(.footnote)
@@ -1665,7 +1641,9 @@ struct ContentView: View {
 
             HStack {
                 Text(
+                    exhaustionLabel(
                         result.systemicRisk
+                    )
                 )
                 .font(.title.bold())
                 .foregroundStyle(
