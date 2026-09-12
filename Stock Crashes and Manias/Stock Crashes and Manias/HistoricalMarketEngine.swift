@@ -381,7 +381,7 @@ final class HistoricalMarketEngine {
     func caAnalysis(
         for period: HistoricalCrashPeriod,
         using engine: MarketExhaustionEngine
-    ) -> MarketSimulationResult {
+    ) -> HistoricalCAResult {
 
         let years =
             period.priorYears.sorted {
@@ -453,22 +453,22 @@ final class HistoricalMarketEngine {
         )
 
 
-        return engine.analyze(
+        let input = HistoricalCAInput(
             year: period.crashYear,
             growthM2: growthM2,
-            moneyPolicyChangeImpact: moneyPolicyChangeImpact,
-            bankingCreditStressRating: bankingCreditStressRating,
             inflationPercent: inflationPercent,
             taxGrowthPercent: taxGrowthPercent,
             economicGrowthPercent: economicGrowthPercent,
             stockGrowthPercent: stockGrowthPercent,
-            previousStockGrowthPercent:
-                previousStockGrowthPercent,
-            bondYieldAvgPercent: bondYieldAvgPercent,
+            previousStockGrowthPercent: previousStockGrowthPercent,
+            growthBondPercent: bondYieldAvgPercent,
             growthVolumePercent: growthVolumePercent,
-            crashInterval: interval,
-            externalShockPercent: 0
+            cyclePressurePercent: interval,
+            shockPressurePercent: 0,
+            moneyPolicyChangeImpact: moneyPolicyChangeImpact,
+            bankingCreditStressRating: bankingCreditStressRating
         )
+        return engine.analyze(input:input)
     }
 
     private func normalize(
@@ -502,3 +502,4 @@ final class HistoricalMarketEngine {
         )
     }
 }
+

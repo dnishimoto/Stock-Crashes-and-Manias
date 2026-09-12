@@ -8,89 +8,135 @@
 import Foundation
 import SwiftUI
 
-struct HistoricalCAInput: Identifiable {
+struct MarketSimulationResult: Identifiable {
 
     let id: UUID
     let year: Int
+    let isCrashYear: Bool
+
+    let initialEnergy: Double
+    let finalEnergy: Double
+    let energyDepletion: Double
+    let usefulFuel: Double
+
+    let finalMomentum: Double
+    let momentumDrive: Double
+    let financialPathForce: Double
+
+    let financialPotential: Double
+    let potentialGradient: Double
+
+    let meanExhaustion: Double
+    let localExhaustion: Double
+    let totalExhaustion: Double
+
+    let meanStress: Double
+    let criticalFraction: Double
+    let releaseFraction: Double
+
+    let bankingStress: Double
+    let bankingPolicyInteraction: Double
+    let effectiveFinancialMass: Double
+
+    let contagion: Double
+    let contagionAmplifier: Double
+
+    let equilibriumPressure: Double
+    let equilibriumInflection: Double
+
+    let nonlinearFinancialAttractor: Double
+
+    let systemicRisk: Double
+    let overdrivePressure: Double
+
+    let cells: [MarketCell]
+
+    // existing initializer...
+}
+
+struct MarketCell: Identifiable {
+
+    let id: UUID
+
+    var energy: Double
+    var momentum: Double
+    var exhaustion: Double
+    var stress: Double
+
+    // Financial-gravity field.
+    //
+    // Higher values represent a deeper effective financial
+    // potential/resistance state.
+    var financialPotential: Double
+
+    var state: MarketState
+
+    init(
+        id: UUID = UUID(),
+        energy: Double = 0.50,
+        momentum: Double = 0.00,
+        exhaustion: Double = 0.00,
+        stress: Double = 0.00,
+        financialPotential: Double = 0.00,
+        state: MarketState = .stable
+    ) {
+        self.id = id
+        self.energy = energy
+        self.momentum = momentum
+        self.exhaustion = exhaustion
+        self.stress = stress
+        self.financialPotential = financialPotential
+        self.state = state
+    }
+}
+
+// ============================================================
+// MARK: - Market State
+// ============================================================
+
+enum MarketState: String {
+
+    case stable
+    case rising
+    case stressed
+    case critical
+    case released
+}
+
+// ============================================================
+// MARK: - Historical Input
+// ============================================================
+
+struct HistoricalCAInput {
+
+    let year: Int
 
     let growthM2: Double
-
-    /// -10 = strongly contractionary
-    ///  0  = neutral
-    /// +10 = strongly expansionary
-    ///
-    /// The current CA uses the magnitude of the intervention
-    /// as an exhaustion pressure.
-    let moneyPolicyChangeImpact: Double
-    let bankingCreditStressRating : Double
-
     let inflationPercent: Double
+
     let taxGrowthPercent: Double
     let economicGrowthPercent: Double
 
     let stockGrowthPercent: Double
     let previousStockGrowthPercent: Double
 
-    let bondYieldAvgPercent: Double
-
-    /// Year-over-year trading-volume change.
-    ///
-    /// This is NOT the raw stock-volume level.
+    let growthBondPercent: Double
     let growthVolumePercent: Double
 
-    let crashInterval: Double
-    let externalShockPercent: Double
+    let cyclePressurePercent: Double
+    let shockPressurePercent: Double
 
+    let moneyPolicyChangeImpact: Double
 
-    init(
-        year: Int,
-        growthM2: Double,
-        moneyPolicyChangeImpact: Double = 0,
-        bankingCreditStressRating: Double = 1,
-        inflationPercent: Double,
-        taxGrowthPercent: Double,
-        economicGrowthPercent: Double,
-        stockGrowthPercent: Double,
-        previousStockGrowthPercent: Double,
-        bondYieldAvgPercent: Double,
-        growthVolumePercent: Double,
-        crashInterval: Double,
-        externalShockPercent: Double = 0
-    ) {
-        self.id = UUID()
-
-        self.year = year
-
-        self.growthM2 = growthM2
-
-        self.moneyPolicyChangeImpact = min(
-            max(moneyPolicyChangeImpact, -10),
-            10
-        )
-
-        self.inflationPercent = inflationPercent
-        self.taxGrowthPercent = taxGrowthPercent
-        self.economicGrowthPercent = economicGrowthPercent
-
-        self.stockGrowthPercent = stockGrowthPercent
-        self.previousStockGrowthPercent =
-            previousStockGrowthPercent
-
-        self.bondYieldAvgPercent =
-            bondYieldAvgPercent
-
-        self.growthVolumePercent =
-            growthVolumePercent
-
-        self.crashInterval =
-            crashInterval
-
-        self.externalShockPercent =
-            externalShockPercent
-        
-        self.bankingCreditStressRating=bankingCreditStressRating
-    }
+    let bankingCreditStressRating: Double
+    
+    //let localExhaustion: Double
+    //let totalExhaustion: Double
 }
+// ============================================================
+// MARK: - Historical Frame
+// ============================================================
+
 struct HistoricalCAFrame: Identifiable {
 
     let id: UUID
@@ -101,110 +147,64 @@ struct HistoricalCAFrame: Identifiable {
     let moneyEnergyChange: Double
     let volumePressure: Double
 
-    let meanEnergy: Double
-    let meanMomentum: Double
-    let meanExhaustion: Double
-    let meanStress: Double
-
     let cells: [MarketCell]
 
     init(
+        id: UUID = UUID(),
         year: Int,
         isCrashYear: Bool,
         moneyEnergyChange: Double,
         volumePressure: Double,
         cells: [MarketCell]
     ) {
-        self.id = UUID()
-
+        self.id = id
         self.year = year
         self.isCrashYear = isCrashYear
-
         self.moneyEnergyChange = moneyEnergyChange
         self.volumePressure = volumePressure
-
         self.cells = cells
-
-        self.meanEnergy = MarketExhaustionEngine.mean(
-            cells.map(\.energy)
-        )
-
-        self.meanMomentum = MarketExhaustionEngine.mean(
-            cells.map(\.momentum)
-        )
-
-        self.meanExhaustion = MarketExhaustionEngine.mean(
-            cells.map(\.exhaustion)
-        )
-
-        self.meanStress = MarketExhaustionEngine.mean(
-            cells.map(\.stress)
-        )
     }
 }
-struct MarketSimulationResult {
 
-    let year: Int
+// ============================================================
+// MARK: - Historical Result
+// ============================================================
 
-    // Historical economic pressures
+struct HistoricalCAResult {
 
-    let moneyPressure: Double
-    let inflationPressure: Double
-    let taxationPressure: Double
-    let economicGrowthPressure: Double
-    let stockGrowthPressure: Double
-    let stockSlowdownPressure: Double
-    let bondPressure: Double
-    let volumePressure: Double
-    let cyclePressure: Double
-    let shockPressure: Double
-
-    // Cellular automaton results
+    let crashYear: Int
 
     let meanEnergy: Double
     let meanMomentum: Double
     let meanExhaustion: Double
     let meanStress: Double
-
-    // State distribution
+    let meanFinancialPotential: Double
 
     let criticalFraction: Double
     let releaseFraction: Double
 
-    // Derived market conditions
+    let energyDepletion: Double
+    let stockSlowdown: Double
+    let inflationPressure: Double
+    let shockPressure: Double
 
-    let usefulFuel: Double
-    let overdrivePressure: Double
-    let equilibriumPressure: Double
+    let bankingStress: Double
+    let bankingPolicyInteraction: Double
+
     let equilibriumInflection: Double
     let systemicRisk: Double
 
-    // Final cellular state
+    let usefulFuel: Double
+    let overdrivePressure: Double
 
-    let cells: [MarketCell]
+    var isHighSystemicRisk: Bool {
+        systemicRisk >= 0.50
+    }
 
-    // MARK: - Risk Classification
-
-    var riskLevel: String {
-        switch systemicRisk {
-        case 0..<0.20:
-            return "Stable"
-
-        case 0.20..<0.40:
-            return "Rising"
-
-        case 0.40..<0.65:
-            return "Stressed"
-
-        case 0.65..<0.85:
-            return "Critical"
-
-        default:
-            return "Crash / Release"
-        }
+    var isCriticalSystemicRisk: Bool {
+        systemicRisk >= 0.65
     }
 }
-
 
 
 let historicalMarketJSON = """
@@ -929,30 +929,4 @@ enum MarketCellState: String {
             return "Release"
         }
     }
-}
-
-struct MarketCell: Identifiable {
-
-    let id: UUID
-
-    var energy: Double
-    var momentum: Double
-
-    var momentumChange: Double
-
-    var equilibrium: Double
-    var equilibriumInflection: Double
-
-    var inflationExhaustion: Double
-    var taxationExhaustion: Double
-    var stockGrowthExhaustion: Double
-
-    var contagionExhaustion: Double
-    var intervalExhaustion: Double
-    var internalExhaustion: Double
-
-    var exhaustion: Double
-    var stress: Double
-
-    var state: MarketCellState
 }
