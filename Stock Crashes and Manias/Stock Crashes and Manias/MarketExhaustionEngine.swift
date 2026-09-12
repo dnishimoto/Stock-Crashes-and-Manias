@@ -1439,6 +1439,55 @@ final class MarketExhaustionEngine {
             + 0.10 * finalMeanFinancialPotential
         )
 
+        // ----------------------------------------------------
+        // Financial-gravity / cellular-automaton detail
+        // ----------------------------------------------------
+
+        let potentialGradient =
+            aggregatePotentialGradient()
+
+        // "Local" exhaustion surfaces the worst single cell,
+        // as distinct from the grid-wide mean.
+
+        let localExhaustion = cells
+            .map { $0.exhaustion }
+            .max() ?? finalMeanExhaustion
+
+        // "Total" exhaustion is a system-wide composite that
+        // also weighs how far exhaustion has already spread
+        // into critical/release cells, rather than a plain
+        // average.
+
+        let totalExhaustion = clamp(
+            0.60 * finalMeanExhaustion
+            + 0.25 * criticalFraction
+            + 0.15 * releaseFraction
+        )
+
+        // Effective financial mass mirrors the per-cell
+        // definition used during step(): banking/credit
+        // fragility behaves like mass.
+
+        let effectiveFinancialMass = bankingStress
+
+        // Aggregate nonlinear financial attractor, following
+        // the same shape as the per-cell version but driven by
+        // the grid-wide financial potential.
+
+        let nonlinearFinancialAttractor = clamp(
+            financialAttractorPressure
+                * (
+                    0.50
+                    + 0.50 * finalMeanFinancialPotential
+                )
+        )
+
+        let contagion = clamp(
+            0.50 * finalMeanExhaustion
+            + 0.30 * finalMeanStress
+            + 0.20 * potentialGradient
+        )
+
         return HistoricalCAResult(
             crashYear: crashYear.year,
 
@@ -1461,12 +1510,31 @@ final class MarketExhaustionEngine {
             bankingPolicyInteraction:
                 bankingPolicyInteraction,
 
+            equilibriumPressure: equilibriumPressure,
             equilibriumInflection:
                 equilibriumInflection,
-            systemicRisk: systemicRisk,
 
             usefulFuel: usefulFuel,
-            overdrivePressure: overdrivePressure
+            overdrivePressure: overdrivePressure,
+            systemicRisk: systemicRisk,
+
+            finalEnergy: finalMeanEnergy,
+            finalMomentum: finalMeanMomentum,
+
+            financialPotential: finalMeanFinancialPotential,
+            potentialGradient: potentialGradient,
+
+            localExhaustion: localExhaustion,
+            totalExhaustion: totalExhaustion,
+
+            effectiveFinancialMass: effectiveFinancialMass,
+            financialPathForce: directionalFinancialForce,
+
+            contagion: contagion,
+            nonlinearFinancialAttractor:
+                nonlinearFinancialAttractor,
+
+            cells: cells
         )
     }
 
@@ -1481,6 +1549,40 @@ final class MarketExhaustionEngine {
         analyzeHistoricalSequence(
             priorYears: [],
             crashYear: input
+        )
+    }
+
+    // ========================================================
+    // MARK: Aggregate Potential Gradient
+    // ========================================================
+    //
+    // Averages, across the final grid, the magnitude of each
+    // cell's financial-potential difference from its
+    // neighborhood mean. This is the aggregate analogue of the
+    // per-cell `potentialGradient` computed during step().
+
+    private func aggregatePotentialGradient() -> Double {
+
+        guard !cells.isEmpty else {
+            return 0.0
+        }
+
+        let gradients = cells.indices.map { index -> Double in
+
+            let neighborPotential = mean(
+                neighborIndices(for: index).map {
+                    cells[$0].financialPotential
+                }
+            )
+
+            return abs(
+                neighborPotential
+                    - cells[index].financialPotential
+            )
+        }
+
+        return clamp(
+            mean(gradients)
         )
     }
 

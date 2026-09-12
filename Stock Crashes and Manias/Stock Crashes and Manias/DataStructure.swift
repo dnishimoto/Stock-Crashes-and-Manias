@@ -8,51 +8,6 @@
 import Foundation
 import SwiftUI
 
-struct MarketSimulationResult: Identifiable {
-
-    let id: UUID
-    let year: Int
-    let isCrashYear: Bool
-
-    let initialEnergy: Double
-    let finalEnergy: Double
-    let energyDepletion: Double
-    let usefulFuel: Double
-
-    let finalMomentum: Double
-    let momentumDrive: Double
-    let financialPathForce: Double
-
-    let financialPotential: Double
-    let potentialGradient: Double
-
-    let meanExhaustion: Double
-    let localExhaustion: Double
-    let totalExhaustion: Double
-
-    let meanStress: Double
-    let criticalFraction: Double
-    let releaseFraction: Double
-
-    let bankingStress: Double
-    let bankingPolicyInteraction: Double
-    let effectiveFinancialMass: Double
-
-    let contagion: Double
-    let contagionAmplifier: Double
-
-    let equilibriumPressure: Double
-    let equilibriumInflection: Double
-
-    let nonlinearFinancialAttractor: Double
-
-    let systemicRisk: Double
-    let overdrivePressure: Double
-
-    let cells: [MarketCell]
-
-    // existing initializer...
-}
 
 struct MarketCell: Identifiable {
 
@@ -191,11 +146,38 @@ struct HistoricalCAResult {
     let bankingStress: Double
     let bankingPolicyInteraction: Double
 
+    let equilibriumPressure: Double
     let equilibriumInflection: Double
-    let systemicRisk: Double
 
     let usefulFuel: Double
     let overdrivePressure: Double
+    let systemicRisk: Double
+
+    // ----------------------------------------------------
+    // Financial-gravity / cellular-automaton detail
+    // ----------------------------------------------------
+    //
+    // These mirror the aggregate CA state (final grid) so
+    // the UI can present the same "current scenario" and
+    // "historical crash year" cards from a single result
+    // type.
+
+    let finalEnergy: Double
+    let finalMomentum: Double
+
+    let financialPotential: Double
+    let potentialGradient: Double
+
+    let localExhaustion: Double
+    let totalExhaustion: Double
+
+    let effectiveFinancialMass: Double
+    let financialPathForce: Double
+
+    let contagion: Double
+    let nonlinearFinancialAttractor: Double
+
+    let cells: [MarketCell]
 
     var isHighSystemicRisk: Bool {
         systemicRisk >= 0.50
