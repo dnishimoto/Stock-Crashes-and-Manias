@@ -174,7 +174,45 @@ struct MarketCell: Identifiable {
 // MARK: - Model Parameters
 
 struct MarketParameters {
+    var energyTransferRate: Double = 0.15
 
+    var moneySupplyEnergyWeight: Double = 0.30
+
+    var economicGrowthEnergyWeight: Double = 0.20
+
+    var externalShockEnergyWeight: Double = 0.20
+
+    var macroEnergyInjectionRate: Double = 0.25
+
+    var macroMomentumResponse: Double = 0.20
+
+    var potentialGradientResponse: Double = 0.20
+
+    var momentumTransferRate: Double = 0.15
+
+    var inflationLiquidityRate: Double = 0.10
+
+    var bondYieldLiquidityRate: Double = 0.10
+
+    var bankingLiquidityRate: Double = 0.15
+
+    var taxLiquidityRate: Double = 0.05
+
+    var taxCapitalRate: Double = 0.10
+
+    var bankingCapitalRate: Double = 0.15
+
+    var externalShockCapitalRate: Double = 0.20
+
+    var macroExhaustionRate: Double = 0.15
+
+    var macroStressWeight: Double = 0.20
+
+    var energyDepletionStressWeight: Double = 0.25
+
+    var energyDissipationWeight: Double = 0.25
+
+    var severeEnergyDepletionThreshold: Double = 0.05
     // ------------------------------------------------------------
     // Grid
     // ------------------------------------------------------------

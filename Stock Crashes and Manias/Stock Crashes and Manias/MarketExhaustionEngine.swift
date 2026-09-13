@@ -36,42 +36,6 @@
 
  */
 
-//
-//  MarketExhaustionEngine.swift
-//  Stock Crashes and Manias
-//
-//  Full historical market-exhaustion model.
-//
-//  The model combines:
-//
-//  Historical crash intervals
-//      ↓
-//  Power-law equilibrium pressure
-//      ↓
-//  Historical/current volume pressure
-//      ↓
-//  Cellular automaton
-//      ↓
-//  Energy
-//      ↓
-//  Momentum
-//      ↓
-//  Financial potential
-//      ↓
-//  Liquidity / capital depletion
-//      ↓
-//  Exhaustion
-//      ↓
-//  Neighbor contagion
-//      ↓
-//  Dissipation
-//      ↓
-//  Stress
-//      ↓
-//  Market state
-//      ↓
-//  Systemic risk
-//
 
 import Foundation
 import SwiftUI
@@ -788,35 +752,198 @@ final class MarketExhaustionEngine: ObservableObject {
 
     // MARK: - Cellular Automaton Step
 
-    func step(
+    /// Renamed from "step" to avoid conflict with simd module.
+    ///
+    /// Advances the cellular automaton by exactly one generation.
+    ///
+    /// All cells read exclusively from `previousCells`.
+    /// No cell can observe another cell's partially updated state.
+    ///
+    /// Macro inputs are normalized before entering the CA so that:
+    /// - money supply affects financial energy and momentum
+    /// - inflation creates resource pressure
+    /// - taxation removes available capital/liquidity
+    /// - economic growth supplies productive energy
+    /// - stock growth supplies momentum
+    /// - stock-growth slowdown creates stress
+    /// - bond yields create financing pressure
+    /// - banking stress depletes financial resources
+    /// - monetary policy affects expansion/contraction
+    /// - trading volume supplies market disturbance
+    /// - crash-cycle equilibrium supplies systemic pressure
+    /// - external shocks disturb energy and stress
+    func stepCA(
         equilibriumPressure: Double,
-        volumePressure: Double
+        volumePressure: Double,
+        moneySupplyChangePercent: Double,
+        inflationPercent: Double,
+        taxationPercent: Double,
+        economicGrowthPercent: Double,
+        stockGrowthPercent: Double,
+        previousStockGrowthPercent: Double,
+        bondYieldAvgPercent: Double,
+        bankingCreditStressRating: Double,
+        moneyPolicyChangeImpact: Double,
+        externalShockPercent: Double
     ) {
-
         guard !cells.isEmpty else {
             return
         }
 
-        // --------------------------------------------------------
+        // ------------------------------------------------------------
         // IMPORTANT:
         //
-        // Every cell reads from the same previous generation.
-        // This prevents the left side of the grid from being
-        // updated using partially updated cells from the right
-        // side of the same generation.
-        // --------------------------------------------------------
+        // Every cell reads from exactly the same previous generation.
+        // This guarantees synchronous CA behavior.
+        // ------------------------------------------------------------
 
         let previousCells = cells
 
+        // ------------------------------------------------------------
+        // 1. NORMALIZE SYSTEM-LEVEL PRESSURES
+        // ------------------------------------------------------------
+
         let normalizedEquilibrium =
-            bounded(
-                equilibriumPressure
-            )
+            bounded(equilibriumPressure)
 
         let normalizedVolume =
+            bounded(volumePressure)
+
+        // ------------------------------------------------------------
+        // Money supply
+        //
+        // ±20% is treated as the strong model range.
+        //
+        // +5%  -> +0.25
+        // -5%  -> -0.25
+        // ------------------------------------------------------------
+
+        let moneySupplyForcing =
             bounded(
-                volumePressure
+                moneySupplyChangePercent / 20.0,
+                minimum: -1.0,
+                maximum: 1.0
             )
+
+        // ------------------------------------------------------------
+        // Inflation
+        //
+        // 10% represents a strong inflationary condition.
+        // ------------------------------------------------------------
+
+        let inflationForcing =
+            bounded(
+                inflationPercent / 10.0
+            )
+
+        // ------------------------------------------------------------
+        // Taxation
+        //
+        // 50% is treated as the strong model range.
+        // ------------------------------------------------------------
+
+        let taxationForcing =
+            bounded(
+                taxationPercent / 50.0
+            )
+
+        // ------------------------------------------------------------
+        // Economic growth
+        //
+        // ±10% represents strong expansion/contraction.
+        // ------------------------------------------------------------
+
+        let growthForcing =
+            bounded(
+                economicGrowthPercent / 10.0,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        // ------------------------------------------------------------
+        // Stock growth
+        //
+        // ±50% represents strong market movement.
+        // ------------------------------------------------------------
+
+        let stockGrowthForcing =
+            bounded(
+                stockGrowthPercent / 50.0,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        // ------------------------------------------------------------
+        // Stock-growth slowdown
+        //
+        // A declining growth rate is itself a stress signal.
+        // ------------------------------------------------------------
+
+        let stockGrowthChange =
+            stockGrowthPercent -
+            previousStockGrowthPercent
+
+        let stockGrowthSlowdown =
+            bounded(
+                -stockGrowthChange / 20.0,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        // ------------------------------------------------------------
+        // Bond yield pressure
+        //
+        // 10% is treated as a strong financing-pressure condition.
+        // ------------------------------------------------------------
+
+        let bondYieldPressure =
+            bounded(
+                bondYieldAvgPercent / 10.0
+            )
+
+        // ------------------------------------------------------------
+        // Banking / credit stress
+        //
+        // Expected UI range: 0...5.
+        // ------------------------------------------------------------
+
+        let bankingStress =
+            bounded(
+                bankingCreditStressRating / 5.0
+            )
+
+        // ------------------------------------------------------------
+        // Monetary policy
+        //
+        // Positive = expansionary
+        // Negative = contractionary
+        //
+        // Expected model range approximately -1...+1.
+        // ------------------------------------------------------------
+
+        let policyForcing =
+            bounded(
+                moneyPolicyChangeImpact,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        // ------------------------------------------------------------
+        // External shock
+        //
+        // 20% is treated as a very strong disturbance.
+        // Magnitude is used because a shock is destabilizing regardless
+        // of whether its raw sign is positive or negative.
+        // ------------------------------------------------------------
+
+        let externalShock =
+            bounded(
+                abs(externalShockPercent) / 20.0
+            )
+
+        // ------------------------------------------------------------
+        // 2. BASE MARKET FORCING
+        // ------------------------------------------------------------
 
         let externalForcing =
             bounded(
@@ -827,59 +954,280 @@ final class MarketExhaustionEngine: ObservableObject {
                     normalizedVolume
             )
 
+        // ------------------------------------------------------------
+        // 3. MACROECONOMIC ENERGY FORCING
+        //
+        // Expansion:
+        //   money supply
+        //   economic growth
+        //   stock growth
+        //   monetary policy
+        //
+        // Contraction:
+        //   monetary tightening
+        //   inflation
+        //   taxation
+        //   bond yields
+        //   banking stress
+        //   external shock
+        // ------------------------------------------------------------
+
+        let expansionaryEnergy =
+            max(moneySupplyForcing, 0.0) * 0.30
+            +
+            max(growthForcing, 0.0) * 0.20
+            +
+            max(stockGrowthForcing, 0.0) * 0.10
+            +
+            max(policyForcing, 0.0) * 0.10
+
+        let contractionaryEnergy =
+            max(-moneySupplyForcing, 0.0) * 0.25
+            +
+            inflationForcing * 0.10
+            +
+            taxationForcing * 0.10
+            +
+            bondYieldPressure * 0.15
+            +
+            bankingStress * 0.15
+            +
+            externalShock * 0.15
+
+        let macroEnergyForcing =
+            bounded(
+                expansionaryEnergy -
+                contractionaryEnergy,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        // ------------------------------------------------------------
+        // 4. MACROECONOMIC MOMENTUM
+        //
+        // Money supply and growth create directional momentum.
+        // Slowdown, yields, banking stress and shocks oppose it.
+        // ------------------------------------------------------------
+
+        let expansionaryMomentum =
+            moneySupplyForcing * 0.35
+            +
+            growthForcing * 0.20
+            +
+            stockGrowthForcing * 0.20
+            +
+            policyForcing * 0.10
+
+        let contractionaryMomentum =
+            stockGrowthSlowdown * 0.20
+            +
+            bondYieldPressure * 0.15
+            +
+            bankingStress * 0.20
+            +
+            externalShock * 0.15
+
+        let macroMomentumForcing =
+            bounded(
+                expansionaryMomentum -
+                contractionaryMomentum,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        // ------------------------------------------------------------
+        // 5. MACROECONOMIC STRESS
+        // ------------------------------------------------------------
+
+        let macroStressForcing =
+            bounded(
+                inflationForcing * 0.15
+                +
+                taxationForcing * 0.10
+                +
+                bondYieldPressure * 0.15
+                +
+                bankingStress * 0.20
+                +
+                stockGrowthSlowdown * 0.15
+                +
+                externalShock * 0.20
+                +
+                max(-growthForcing, 0.0) * 0.10
+            )
+
+        // ------------------------------------------------------------
+        // 6. SYNCHRONOUS CELL UPDATE
+        // ------------------------------------------------------------
+
         for index in previousCells.indices {
 
             let previous =
                 previousCells[index]
 
-            // ----------------------------------------------------
-            // 1. External market forcing
-            // ----------------------------------------------------
+            // --------------------------------------------------------
+            // Neighbor field
+            // --------------------------------------------------------
 
-            let forcing =
-                externalForcing
+            let neighbors =
+                neighborIndices(for: index)
 
-            // ----------------------------------------------------
-            // 2. Energy accumulation
-            // ----------------------------------------------------
+            let neighborCount =
+                max(neighbors.count, 1)
 
-            let injectedEnergy =
-                forcing *
+            var neighborEnergy = 0.0
+            var neighborMomentum = 0.0
+            var neighborPotential = 0.0
+            var neighborStress = 0.0
+
+            for neighborIndex in neighbors {
+
+                guard neighborIndex >= 0,
+                      neighborIndex < previousCells.count
+                else {
+                    continue
+                }
+
+                let neighbor =
+                    previousCells[neighborIndex]
+
+                neighborEnergy +=
+                    neighbor.energy
+
+                neighborMomentum +=
+                    neighbor.momentum
+
+                neighborPotential +=
+                    neighbor.financialPotential
+
+                neighborStress +=
+                    neighbor.stress
+            }
+
+            neighborEnergy /=
+                Double(neighborCount)
+
+            neighborMomentum /=
+                Double(neighborCount)
+
+            neighborPotential /=
+                Double(neighborCount)
+
+            neighborStress /=
+                Double(neighborCount)
+
+            // --------------------------------------------------------
+            // 7. ENERGY TRANSFER BETWEEN NEIGHBORS
+            //
+            // Energy flows toward a cell when neighboring cells contain
+            // greater available financial energy.
+            // --------------------------------------------------------
+
+            let energyGradient =
+                neighborEnergy -
+                previous.energy
+
+            let energyTransfer =
+                energyGradient *
+                parameters.energyTransferRate
+
+            // --------------------------------------------------------
+            // 8. MONEY-SUPPLY ENERGY
+            //
+            // This is the explicit money-supply -> CA pathway.
+            // --------------------------------------------------------
+
+            let monetaryEnergy =
+                moneySupplyForcing *
+                parameters.moneySupplyEnergyWeight
+
+            // --------------------------------------------------------
+            // 9. ECONOMIC GROWTH ENERGY
+            // --------------------------------------------------------
+
+            let growthEnergy =
+                growthForcing *
+                parameters.economicGrowthEnergyWeight
+
+            // --------------------------------------------------------
+            // 10. EXTERNAL SHOCK ENERGY
+            // --------------------------------------------------------
+
+            let disturbanceEnergy =
+                externalShock *
+                parameters.externalShockEnergyWeight
+
+            // --------------------------------------------------------
+            // 11. BASE ENERGY INJECTION
+            // --------------------------------------------------------
+
+            let baseInjectedEnergy =
+                externalForcing *
                 parameters.energyInjectionRate
+
+            let macroInjectedEnergy =
+                macroEnergyForcing *
+                parameters.macroEnergyInjectionRate
+
+            // --------------------------------------------------------
+            // 12. RETAINED ENERGY
+            // --------------------------------------------------------
 
             let retainedEnergy =
                 previous.energy *
                 parameters.energyRetention
 
-            let newEnergy =
-                retainedEnergy +
-                injectedEnergy
+            // --------------------------------------------------------
+            // 13. PRELIMINARY ENERGY
+            // --------------------------------------------------------
 
-            // ----------------------------------------------------
-            // 3. Momentum
-            // ----------------------------------------------------
+            let preliminaryEnergy =
+                retainedEnergy
+                +
+                baseInjectedEnergy
+                +
+                macroInjectedEnergy
+                +
+                monetaryEnergy
+                +
+                growthEnergy
+                +
+                energyTransfer
+                -
+                disturbanceEnergy
+
+            // --------------------------------------------------------
+            // 14. ENERGY CHANGE
+            // --------------------------------------------------------
 
             let directionalChange =
-                newEnergy -
+                preliminaryEnergy -
                 previous.energy
 
-            let newMomentum =
+            // --------------------------------------------------------
+            // 15. PRELIMINARY MOMENTUM
+            // --------------------------------------------------------
+
+            let preliminaryMomentum =
                 previous.momentum *
                     parameters.momentumRetention
                 +
                 directionalChange *
                     parameters.momentumResponse
+                +
+                macroMomentumForcing *
+                    parameters.macroMomentumResponse
 
-            // ----------------------------------------------------
-            // 4. Financial potential
-            // ----------------------------------------------------
+            // --------------------------------------------------------
+            // 16. FINANCIAL POTENTIAL
+            // --------------------------------------------------------
 
             let energyPotential =
-                newEnergy *
+                bounded(preliminaryEnergy) *
                 parameters.potentialEnergyWeight
 
             let momentumPotential =
-                abs(newMomentum) *
+                abs(preliminaryMomentum) *
                 parameters.potentialMomentumWeight
 
             let rawPotential =
@@ -889,18 +1237,56 @@ final class MarketExhaustionEngine: ObservableObject {
                 ) *
                 parameters.potentialGain
 
-            let newFinancialPotential =
-                bounded(
-                    rawPotential
-                )
+            let localPotential =
+                bounded(rawPotential)
 
-            // ----------------------------------------------------
-            // 5. Liquidity depletion
-            // ----------------------------------------------------
+            // --------------------------------------------------------
+            // 17. FINANCIAL-POTENTIAL GRADIENT
+            // --------------------------------------------------------
+
+            let potentialGradient =
+                neighborPotential -
+                localPotential
+
+            let potentialMomentum =
+                potentialGradient *
+                parameters.potentialGradientResponse
+
+            // --------------------------------------------------------
+            // 18. NEIGHBOR MOMENTUM PROPAGATION
+            // --------------------------------------------------------
+
+            let momentumGradient =
+                neighborMomentum -
+                previous.momentum
+
+            let newMomentum =
+                preliminaryMomentum
+                +
+                potentialMomentum
+                +
+                momentumGradient *
+                    parameters.momentumTransferRate
+
+            // --------------------------------------------------------
+            // 19. LIQUIDITY DEPLETION
+            // --------------------------------------------------------
 
             let liquidityPressure =
-                newFinancialPotential *
-                parameters.liquidityDepletionRate
+                localPotential *
+                    parameters.liquidityDepletionRate
+                +
+                inflationForcing *
+                    parameters.inflationLiquidityRate
+                +
+                bondYieldPressure *
+                    parameters.bondYieldLiquidityRate
+                +
+                bankingStress *
+                    parameters.bankingLiquidityRate
+                +
+                taxationForcing *
+                    parameters.taxLiquidityRate
 
             let newLiquidity =
                 bounded(
@@ -908,13 +1294,22 @@ final class MarketExhaustionEngine: ObservableObject {
                     liquidityPressure
                 )
 
-            // ----------------------------------------------------
-            // 6. Capital depletion
-            // ----------------------------------------------------
+            // --------------------------------------------------------
+            // 20. CAPITAL DEPLETION
+            // --------------------------------------------------------
 
             let capitalPressure =
-                newFinancialPotential *
-                parameters.capitalDepletionRate
+                localPotential *
+                    parameters.capitalDepletionRate
+                +
+                taxationForcing *
+                    parameters.taxCapitalRate
+                +
+                bankingStress *
+                    parameters.bankingCapitalRate
+                +
+                externalShock *
+                    parameters.externalShockCapitalRate
 
             let newCapital =
                 bounded(
@@ -922,20 +1317,44 @@ final class MarketExhaustionEngine: ObservableObject {
                     capitalPressure
                 )
 
-            // ----------------------------------------------------
-            // 7. Resource exhaustion
-            // ----------------------------------------------------
+            // --------------------------------------------------------
+            // 21. RESOURCE DEPLETION
+            // --------------------------------------------------------
 
             let resourceDepletion =
-                1.0 -
-                (
-                    0.50 * newLiquidity +
-                    0.50 * newCapital
+                bounded(
+                    1.0 -
+                    (
+                        0.40 * newLiquidity
+                        +
+                        0.40 * newCapital
+                        +
+                        0.20 *
+                            bounded(
+                                preliminaryEnergy
+                            )
+                    )
                 )
+
+            // --------------------------------------------------------
+            // 22. DIRECT ENERGY DEPLETION
+            // --------------------------------------------------------
+
+            let energyDepletion =
+                bounded(
+                    1.0 -
+                    bounded(preliminaryEnergy)
+                )
+
+            // --------------------------------------------------------
+            // 23. EXHAUSTION
+            // --------------------------------------------------------
 
             let exhaustionPressure =
                 bounded(
-                    resourceDepletion
+                    resourceDepletion * 0.70
+                    +
+                    energyDepletion * 0.30
                 )
 
             let recovery =
@@ -943,35 +1362,43 @@ final class MarketExhaustionEngine: ObservableObject {
                 parameters.exhaustionRecoveryRate
 
             let accumulatedExhaustion =
-                previous.exhaustion -
-                recovery +
+                previous.exhaustion
+                -
+                recovery
+                +
                 exhaustionPressure *
                     parameters.exhaustionAccumulationRate
+                +
+                macroStressForcing *
+                    parameters.macroExhaustionRate
 
             let newExhaustion =
                 bounded(
                     accumulatedExhaustion
                 )
 
-            // ----------------------------------------------------
-            // 8. Neighbor contagion
-            // ----------------------------------------------------
+            // --------------------------------------------------------
+            // 24. CONTAGION
+            // --------------------------------------------------------
 
-            let neighborStress =
-                averageNeighborStress(
-                    index: index,
-                    snapshot: previousCells
-                )
+            let stressGradient =
+                neighborStress -
+                previous.stress
+
+            let contagionInput =
+                max(stressGradient, 0.0)
+                +
+                neighborStress * 0.50
 
             let newContagion =
                 bounded(
-                    neighborStress *
+                    contagionInput *
                     parameters.contagionRate
                 )
 
-            // ----------------------------------------------------
-            // 9. Dissipation
-            // ----------------------------------------------------
+            // --------------------------------------------------------
+            // 25. DISSIPATION
+            // --------------------------------------------------------
 
             let rawDissipation =
                 previous.stress *
@@ -982,33 +1409,85 @@ final class MarketExhaustionEngine: ObservableObject {
                     rawDissipation
                 )
 
-            // ----------------------------------------------------
-            // 10. Combined cellular stress
-            // ----------------------------------------------------
+            // --------------------------------------------------------
+            // 26. DISSIPATION REMOVES ENERGY
+            // --------------------------------------------------------
+
+            let dissipatedEnergy =
+                newDissipation *
+                parameters.energyDissipationWeight
+
+            let finalEnergy =
+                bounded(
+                    preliminaryEnergy -
+                    dissipatedEnergy
+                )
+
+            // --------------------------------------------------------
+            // 27. FINAL ENERGY DEPLETION
+            // --------------------------------------------------------
+
+            let finalEnergyDepletion =
+                bounded(
+                    1.0 -
+                    finalEnergy
+                )
+
+            // --------------------------------------------------------
+            // 28. STRESS
+            //
+            // High available energy is not inherently stress.
+            // Depletion is what creates energy-related stress.
+            // --------------------------------------------------------
+
+            let stressFromEnergy =
+                finalEnergyDepletion *
+                parameters.energyDepletionStressWeight
+
+            let stressFromMomentum =
+                abs(newMomentum) *
+                parameters.momentumWeight
+
+            let stressFromPotential =
+                localPotential *
+                parameters.potentialWeight
+
+            let stressFromExhaustion =
+                newExhaustion *
+                parameters.exhaustionWeight
+
+            let stressFromContagion =
+                newContagion *
+                parameters.contagionWeight
+
+            let stressFromMacro =
+                macroStressForcing *
+                parameters.macroStressWeight
+
+            let stressFromExternalForcing =
+                externalForcing *
+                parameters.energyWeight
 
             let rawStress =
-                parameters.energyWeight *
-                    bounded(newEnergy)
+                stressFromEnergy
                 +
-                parameters.momentumWeight *
-                    bounded(
-                        abs(newMomentum)
-                    )
+                stressFromMomentum
                 +
-                parameters.potentialWeight *
-                    newFinancialPotential
+                stressFromPotential
                 +
-                parameters.exhaustionWeight *
-                    newExhaustion
+                stressFromExhaustion
                 +
-                parameters.contagionWeight *
-                    newContagion
+                stressFromContagion
+                +
+                stressFromMacro
+                +
+                stressFromExternalForcing
                 -
                 newDissipation
 
-            // ----------------------------------------------------
-            // 11. Stochastic perturbation
-            // ----------------------------------------------------
+            // --------------------------------------------------------
+            // 29. STOCHASTIC PERTURBATION
+            // --------------------------------------------------------
 
             let noise =
                 (
@@ -1019,24 +1498,56 @@ final class MarketExhaustionEngine: ObservableObject {
 
             let newStress =
                 bounded(
-                    rawStress + noise
+                    rawStress +
+                    noise
                 )
 
-            // ----------------------------------------------------
-            // 12. Discrete state transition
-            // ----------------------------------------------------
+            // --------------------------------------------------------
+            // 30. STATE TRANSITION
+            //
+            // A cell can enter crashed state through either:
+            //
+            // A. critical systemic stress
+            // B. severe remaining-energy depletion
+            // --------------------------------------------------------
 
-            let newState =
-                stateForStress(
-                    newStress
-                )
+            let severeEnergyDepletion =
+                finalEnergy <=
+                parameters.severeEnergyDepletionThreshold
 
-            // ----------------------------------------------------
-            // 13. Commit next generation
-            // ----------------------------------------------------
+            let newState: MarketState
+
+            if severeEnergyDepletion ||
+                newStress >= parameters.crashedThreshold {
+
+                newState = .crashed
+
+            } else if newStress >=
+                        parameters.criticalThreshold {
+
+                newState = .critical
+
+            } else if newStress >=
+                        parameters.stressedThreshold {
+
+                newState = .stressed
+
+            } else if newStress >=
+                        parameters.risingThreshold {
+
+                newState = .rising
+
+            } else {
+
+                newState = .stable
+            }
+
+            // --------------------------------------------------------
+            // 31. SYNCHRONOUS COMMIT
+            // --------------------------------------------------------
 
             cells[index].energy =
-                bounded(newEnergy)
+                finalEnergy
 
             cells[index].momentum =
                 bounded(
@@ -1044,7 +1555,7 @@ final class MarketExhaustionEngine: ObservableObject {
                 )
 
             cells[index].financialPotential =
-                newFinancialPotential
+                localPotential
 
             cells[index].liquidity =
                 newLiquidity
@@ -1068,7 +1579,6 @@ final class MarketExhaustionEngine: ObservableObject {
                 newState
         }
     }
-
     // MARK: - State Classification
 
     private func stateForStress(
@@ -1109,13 +1619,22 @@ final class MarketExhaustionEngine: ObservableObject {
             return
         }
 
+        // TODO: Replace these 0.0 placeholders with real scenario values.
         for _ in 0..<years {
 
-            step(
-                equilibriumPressure:
-                    equilibriumPressure,
-                volumePressure:
-                    volumePressure
+            stepCA(
+                equilibriumPressure: equilibriumPressure,
+                volumePressure: volumePressure,
+                moneySupplyChangePercent: 0.0,         // TODO: provide scenario value
+                inflationPercent: 0.0,                 // TODO: provide scenario value
+                taxationPercent: 0.0,                  // TODO: provide scenario value
+                economicGrowthPercent: 0.0,            // TODO: provide scenario value
+                stockGrowthPercent: 0.0,               // TODO: provide scenario value
+                previousStockGrowthPercent: 0.0,       // TODO: provide scenario value
+                bondYieldAvgPercent: 0.0,              // TODO: provide scenario value
+                bankingCreditStressRating: 0.0,        // TODO: provide scenario value
+                moneyPolicyChangeImpact: 0.0,          // TODO: provide scenario value
+                externalShockPercent: 0.0              // TODO: provide scenario value
             )
         }
     }
@@ -1128,11 +1647,21 @@ final class MarketExhaustionEngine: ObservableObject {
         volumePressure: Double
     ) {
 
-        step(
+        stepCA(
             equilibriumPressure:
                 equilibriumPressure,
             volumePressure:
-                volumePressure
+                volumePressure,
+            moneySupplyChangePercent: 0.0,
+            inflationPercent: 0.0,
+            taxationPercent: 0.0,
+            economicGrowthPercent: 0.0,
+            stockGrowthPercent: 0.0,
+            previousStockGrowthPercent: 0.0,
+            bondYieldAvgPercent: 0.0,
+            bankingCreditStressRating: 0.0,
+            moneyPolicyChangeImpact: 0.0,
+            externalShockPercent: 0.0
         )
 
         let snapshot =
@@ -1858,3 +2387,5 @@ struct SplitMix64 {
         )
     }
 }
+
+
