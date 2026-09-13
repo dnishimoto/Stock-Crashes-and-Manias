@@ -1,13 +1,77 @@
-// MARK: - Engine
+//
+//  MarketExhaustionEngine.swift
+//  Stock Crashes and Manias
+//
+//  Created by David Nishimoto on 9/10/26.
+//
+
+import Foundation
 import SwiftUI
 import Combine
+
+// ============================================================
+// MARK: - Canonical Market Scenario
+// ============================================================
+//
+// This is the single input object passed into the cellular
+// automaton.
+//
+// Raw historical observations are converted into this structure
+// before entering the CA.
+//
+// The CA should never need to know where the values came from.
+//
+
+struct MarketScenario: Equatable {
+
+    var moneySupplyChangePercent: Double = 0.0
+    var inflationPercent: Double = 0.0
+    var taxationPercent: Double = 0.0
+    var economicGrowthPercent: Double = 0.0
+    var stockGrowthPercent: Double = 0.0
+    var previousStockGrowthPercent: Double = 0.0
+    var bondYieldAvgPercent: Double = 0.0
+    var bankingCreditStressRating: Double = 0.0
+    var moneyPolicyChangeImpact: Double = 0.0
+
+    /// Deliberately interpreted as magnitude by the CA.
+    var externalShockMagnitudePercent: Double = 0.0
+
+    init(
+        moneySupplyChangePercent: Double = 0.0,
+        inflationPercent: Double = 0.0,
+        taxationPercent: Double = 0.0,
+        economicGrowthPercent: Double = 0.0,
+        stockGrowthPercent: Double = 0.0,
+        previousStockGrowthPercent: Double = 0.0,
+        bondYieldAvgPercent: Double = 0.0,
+        bankingCreditStressRating: Double = 0.0,
+        moneyPolicyChangeImpact: Double = 0.0,
+        externalShockMagnitudePercent: Double = 0.0
+    ) {
+        self.moneySupplyChangePercent = moneySupplyChangePercent
+        self.inflationPercent = inflationPercent
+        self.taxationPercent = taxationPercent
+        self.economicGrowthPercent = economicGrowthPercent
+        self.stockGrowthPercent = stockGrowthPercent
+        self.previousStockGrowthPercent = previousStockGrowthPercent
+        self.bondYieldAvgPercent = bondYieldAvgPercent
+        self.bankingCreditStressRating = bankingCreditStressRating
+        self.moneyPolicyChangeImpact = moneyPolicyChangeImpact
+        self.externalShockMagnitudePercent = externalShockMagnitudePercent
+    }
+}
+
+// ============================================================
+// MARK: - Engine
+// ============================================================
 
 @MainActor
 final class MarketExhaustionEngine: ObservableObject {
 
-    // ------------------------------------------------------------
-    // Historical records
-    // ------------------------------------------------------------
+    // --------------------------------------------------------
+    // Historical crash records
+    // --------------------------------------------------------
 
     private(set) var crashRecords: [CrashRecord] = [
 
@@ -77,9 +141,9 @@ final class MarketExhaustionEngine: ObservableObject {
         )
     ]
 
-    // ------------------------------------------------------------
+    // --------------------------------------------------------
     // Simulation
-    // ------------------------------------------------------------
+    // --------------------------------------------------------
 
     private(set) var cells: [MarketCell] = []
 
@@ -90,30 +154,52 @@ final class MarketExhaustionEngine: ObservableObject {
 
     private(set) var yearlyRiskHistory: [YearlyRiskSnapshot] = []
 
-    // ------------------------------------------------------------
+    // --------------------------------------------------------
     // Random source
-    // ------------------------------------------------------------
+    // --------------------------------------------------------
 
+    private let randomSeed: UInt64
     private var random: SplitMix64
 
-    // ------------------------------------------------------------
-    // Initialization
-    // ------------------------------------------------------------
+    // --------------------------------------------------------
+    // Historical macro data
+    // --------------------------------------------------------
+
+    private lazy var historicalYears: [HistoricalYear] = {
+        loadHistoricalYears()
+    }()
+
+    // ========================================================
+    // MARK: - Initialization
+    // ========================================================
 
     init(
         parameters: MarketParameters = MarketParameters(),
         seed: UInt64 = 42
     ) {
-
         self.parameters = parameters
-        self.gridWidth = max(parameters.gridWidth, 1)
-        self.gridHeight = max(parameters.gridHeight, 1)
-        self.random = SplitMix64(seed: seed)
+
+        self.gridWidth = max(
+            parameters.gridWidth,
+            1
+        )
+
+        self.gridHeight = max(
+            parameters.gridHeight,
+            1
+        )
+
+        self.randomSeed = seed
+        self.random = SplitMix64(
+            seed: seed
+        )
 
         resetCells()
     }
 
+    // ========================================================
     // MARK: - Numeric Helpers
+    // ========================================================
 
     private func bounded(
         _ value: Double,
@@ -126,7 +212,10 @@ final class MarketExhaustionEngine: ObservableObject {
         }
 
         return min(
-            max(value, minimum),
+            max(
+                value,
+                minimum
+            ),
             maximum
         )
     }
@@ -137,13 +226,20 @@ final class MarketExhaustionEngine: ObservableObject {
         fallback: Double = 0.0
     ) -> Double {
 
-        guard denominator.isFinite,
-              abs(denominator) > Double.leastNonzeroMagnitude,
-              numerator.isFinite else {
+        guard numerator.isFinite,
+              denominator.isFinite,
+              abs(denominator) > Double.leastNonzeroMagnitude
+        else {
             return fallback
         }
 
-        return numerator / denominator
+        let result = numerator / denominator
+
+        guard result.isFinite else {
+            return fallback
+        }
+
+        return result
     }
 
     private func normalized(
@@ -164,85 +260,228 @@ final class MarketExhaustionEngine: ObservableObject {
         )
     }
 
-    // MARK: - Historical Power Law
+    // ========================================================
+    // MARK: - Historical Data Loading
+    // ========================================================
 
+    private func loadHistoricalYears() -> [HistoricalYear] {
+
+        guard let data = historicalMarketJSON.data(
+            using: .utf8
+        ) else {
+            return []
+        }
+
+        do {
+
+            let root = try JSONDecoder().decode(
+                HistoricalJSONRoot.self,
+                from: data
+            )
+
+            var result: [HistoricalYear] = []
+
+            for period in root.crashPeriods {
+
+                result.append(
+                    contentsOf: period.priorYears
+                )
+            }
+
+            // Remove duplicate years.
+            var byYear: [Int: HistoricalYear] = [:]
+
+            for item in result {
+                byYear[item.year] = item
+            }
+
+            return byYear.values.sorted {
+                $0.year < $1.year
+            }
+
+        } catch {
+
+            return []
+        }
+    }
+
+    // ========================================================
+    // MARK: - Historical Scenario
+    // ========================================================
+
+    /// Returns the latest historical observation that would
+    /// have been available for the requested year.
+    ///
+    /// Example:
+    ///
+    /// analyze 2008
+    ///      ↓
+    /// latest embedded observation <= 2008
+    ///      ↓
+    /// 2007 data
+    ///
+    /// This avoids using future information.
+    private func historicalScenario(
+        for year: Int
+    ) -> MarketScenario {
+
+        let eligible = historicalYears.filter {
+            $0.year <= year
+        }
+
+        guard let current = eligible.last else {
+            return MarketScenario()
+        }
+
+        let previous = eligible.dropLast().last
+
+        return MarketScenario(
+
+            moneySupplyChangePercent:
+                finiteOrZero(
+                    current.m2GrowthPercent
+                ),
+
+            inflationPercent:
+                finiteOrZero(
+                    current.inflationPercent
+                ),
+
+            taxationPercent:
+                finiteOrZero(
+                    current.taxGrowthPercent
+                ),
+
+            economicGrowthPercent:
+                finiteOrZero(
+                    current.economicGrowthPercent
+                ),
+
+            stockGrowthPercent:
+                finiteOrZero(
+                    current.stockGrowthPercent
+                ),
+
+            previousStockGrowthPercent:
+                finiteOrZero(
+                    previous?.stockGrowthPercent
+                ),
+
+            bondYieldAvgPercent:
+                finiteOrZero(
+                    current.bondYieldAvgPercent
+                ),
+
+            bankingCreditStressRating:
+                finiteOrZero(
+                    current.bankingCreditStressRating
+                ),
+
+            moneyPolicyChangeImpact:
+                finiteOrZero(
+                    current.moneyPolicyChangeImpact
+                ),
+
+            externalShockMagnitudePercent:
+                0.0
+        )
+    }
+
+    private func finiteOrZero(
+        _ value: Double?
+    ) -> Double {
+
+        guard let value,
+              value.isFinite
+        else {
+            return 0.0
+        }
+
+        return value
+    }
+
+    // ========================================================
+    // MARK: - Historical Cycle Pressure
+    // ========================================================
+
+    /// Backward-compatible public API.
+    ///
+    /// This is retained for the UI and existing callers.
+    ///
+    /// Internally the quantity is a model-defined cycle-pressure
+    /// exponent derived from crash-interval dispersion. It is not
+    /// a conventional statistical power-law maximum-likelihood
+    /// exponent.
     func estimatePowerLawAlpha() -> Double {
 
         guard crashRecords.count >= 2 else {
             return 2.0
         }
 
-        return estimatePowerLawAlpha(
-            upThroughCrashIndex: crashRecords.count - 1
+        return estimateCyclePressureExponent(
+            upThroughCrashIndex:
+                crashRecords.count - 1
         )
     }
 
-    private func estimatePowerLawAlpha(
+    private func estimateCyclePressureExponent(
         upThroughCrashIndex crashIndex: Int
     ) -> Double {
 
         guard crashIndex > 0,
-              crashIndex < crashRecords.count else {
+              crashIndex < crashRecords.count
+        else {
             return 2.0
         }
 
-        var intervalRatios: [Double] = []
+        let intervals = crashIntervals(
+            upThroughCrashIndex:
+                crashIndex
+        )
 
-        for index in 1...crashIndex {
-
-            let previous = crashRecords[index - 1]
-            let current = crashRecords[index]
-
-            let interval = Double(
-                max(
-                    current.year - previous.year,
-                    1
-                )
-            )
-
-            guard interval.isFinite else {
-                continue
-            }
-
-            intervalRatios.append(interval)
-        }
-
-        guard intervalRatios.count >= 2 else {
+        guard intervals.count >= 2 else {
             return 2.0
         }
 
-        let mean = intervalRatios.reduce(
-            0.0,
-            +
-        ) / Double(intervalRatios.count)
+        let mean =
+            intervals.reduce(
+                0.0,
+                +
+            ) /
+            Double(intervals.count)
 
-        guard mean > 0.0 else {
+        guard mean > 0.0,
+              mean.isFinite
+        else {
             return 2.0
         }
 
         var variance = 0.0
 
-        for value in intervalRatios {
+        for interval in intervals {
 
-            let difference = value - mean
+            let difference =
+                interval - mean
 
             variance +=
                 difference * difference
         }
 
-        variance /= Double(
-            max(
-                intervalRatios.count - 1,
-                1
+        variance /=
+            Double(
+                max(
+                    intervals.count - 1,
+                    1
+                )
             )
-        )
 
-        let standardDeviation = sqrt(
-            max(
-                variance,
-                0.0
+        let standardDeviation =
+            sqrt(
+                max(
+                    variance,
+                    0.0
+                )
             )
-        )
 
         guard standardDeviation.isFinite else {
             return 2.0
@@ -255,9 +494,7 @@ final class MarketExhaustionEngine: ObservableObject {
                 fallback: 0.0
             )
 
-        // Stable bounded exponent.
-        let alpha =
-            1.0 +
+        let boundedCoefficient =
             min(
                 max(
                     coefficient,
@@ -266,6 +503,10 @@ final class MarketExhaustionEngine: ObservableObject {
                 2.0
             )
 
+        let alpha =
+            1.0 +
+            boundedCoefficient
+
         return bounded(
             alpha / 3.0,
             minimum: 0.25,
@@ -273,7 +514,9 @@ final class MarketExhaustionEngine: ObservableObject {
         )
     }
 
+    // ========================================================
     // MARK: - Crash Intervals
+    // ========================================================
 
     private func crashIntervals() -> [Double] {
 
@@ -282,7 +525,8 @@ final class MarketExhaustionEngine: ObservableObject {
         }
 
         return crashIntervals(
-            upThroughCrashIndex: crashRecords.count - 1
+            upThroughCrashIndex:
+                crashRecords.count - 1
         )
     }
 
@@ -290,7 +534,9 @@ final class MarketExhaustionEngine: ObservableObject {
         upThroughCrashIndex crashIndex: Int
     ) -> [Double] {
 
-        guard crashIndex > 0 else {
+        guard crashIndex > 0,
+              crashIndex < crashRecords.count
+        else {
             return []
         }
 
@@ -298,35 +544,50 @@ final class MarketExhaustionEngine: ObservableObject {
 
         for index in 1...crashIndex {
 
-            let previous = crashRecords[index - 1]
-            let current = crashRecords[index]
+            let previous =
+                crashRecords[index - 1]
 
-            let interval = Double(
-                max(
-                    current.year - previous.year,
-                    1
+            let current =
+                crashRecords[index]
+
+            let interval =
+                Double(
+                    max(
+                        current.year -
+                        previous.year,
+                        1
+                    )
                 )
-            )
 
-            result.append(interval)
+            if interval.isFinite {
+                result.append(interval)
+            }
         }
 
         return result
     }
 
-    // MARK: - Power Law Pressure
+    // ========================================================
+    // MARK: - Cycle Pressure
+    // ========================================================
 
     func powerLawPressure(
         yearsSinceCrash: Int
     ) -> Double {
 
-        let intervals = crashIntervals()
-        let alpha = estimatePowerLawAlpha()
+        let intervals =
+            crashIntervals()
+
+        let alpha =
+            estimatePowerLawAlpha()
 
         return powerLawPressure(
-            yearsSinceCrash: yearsSinceCrash,
-            alpha: alpha,
-            intervals: intervals
+            yearsSinceCrash:
+                yearsSinceCrash,
+            alpha:
+                alpha,
+            intervals:
+                intervals
         )
     }
 
@@ -342,7 +603,8 @@ final class MarketExhaustionEngine: ObservableObject {
 
         let positiveIntervals =
             intervals.filter {
-                $0.isFinite && $0 > 0.0
+                $0.isFinite &&
+                $0 > 0.0
             }
 
         guard !positiveIntervals.isEmpty else {
@@ -353,7 +615,8 @@ final class MarketExhaustionEngine: ObservableObject {
             positiveIntervals.reduce(
                 0.0,
                 +
-            ) / Double(
+            ) /
+            Double(
                 positiveIntervals.count
             )
 
@@ -375,12 +638,12 @@ final class MarketExhaustionEngine: ObservableObject {
             )
 
         let exponent =
-            max(
-                min(
+            min(
+                max(
                     alpha,
-                    4.0
+                    0.05
                 ),
-                0.05
+                4.0
             )
 
         let raw =
@@ -396,7 +659,9 @@ final class MarketExhaustionEngine: ObservableObject {
         return bounded(raw)
     }
 
+    // ========================================================
     // MARK: - Volume Pressure
+    // ========================================================
 
     func calculateVolumePressure() -> Double {
 
@@ -420,9 +685,12 @@ final class MarketExhaustionEngine: ObservableObject {
             ]
 
         return volumePressure(
-            recent: recent.volumeMillions,
-            previous: previous.volumeMillions,
-            older: older.volumeMillions
+            recent:
+                recent.volumeMillions,
+            previous:
+                previous.volumeMillions,
+            older:
+                older.volumeMillions
         )
     }
 
@@ -439,22 +707,62 @@ final class MarketExhaustionEngine: ObservableObject {
             return 0.0
         }
 
-        let recent = sorted[
-            sorted.count - 1
-        ].volumeMillions
+        let recent =
+            sorted[sorted.count - 1]
+                .volumeMillions
 
-        let previous = sorted[
-            sorted.count - 2
-        ].volumeMillions
+        let previous =
+            sorted[sorted.count - 2]
+                .volumeMillions
 
-        let older = sorted[
-            sorted.count - 3
-        ].volumeMillions
+        let older =
+            sorted[sorted.count - 3]
+                .volumeMillions
 
         return volumePressure(
-            recent: recent,
-            previous: previous,
-            older: older
+            recent:
+                recent,
+            previous:
+                previous,
+            older:
+                older
+        )
+    }
+
+    /// Calculates pressure from the three crash observations
+    /// immediately available at a given historical year.
+    ///
+    /// This is deliberately not called with the terminal crash
+    /// record for every year of a historical interval.
+    private func historicalVolumePressure(
+        forYear year: Int
+    ) -> Double {
+
+        let eligible =
+            crashRecords.filter {
+                $0.year <= year
+            }
+
+        guard eligible.count >= 3 else {
+            return 0.0
+        }
+
+        let recent =
+            eligible[eligible.count - 1]
+
+        let previous =
+            eligible[eligible.count - 2]
+
+        let older =
+            eligible[eligible.count - 3]
+
+        return volumePressure(
+            recent:
+                recent.volumeMillions,
+            previous:
+                previous.volumeMillions,
+            older:
+                older.volumeMillions
         )
     }
 
@@ -463,7 +771,8 @@ final class MarketExhaustionEngine: ObservableObject {
     ) -> Double {
 
         guard crashIndex >= 2,
-              crashIndex < crashRecords.count else {
+              crashIndex < crashRecords.count
+        else {
             return 0.0
         }
 
@@ -477,9 +786,12 @@ final class MarketExhaustionEngine: ObservableObject {
             crashRecords[crashIndex - 2]
 
         return volumePressure(
-            recent: recent.volumeMillions,
-            previous: previous.volumeMillions,
-            older: older.volumeMillions
+            recent:
+                recent.volumeMillions,
+            previous:
+                previous.volumeMillions,
+            older:
+                older.volumeMillions
         )
     }
 
@@ -491,7 +803,8 @@ final class MarketExhaustionEngine: ObservableObject {
 
         guard recent.isFinite,
               previous.isFinite,
-              older.isFinite else {
+              older.isFinite
+        else {
             return 0.0
         }
 
@@ -514,7 +827,8 @@ final class MarketExhaustionEngine: ObservableObject {
             )
 
         let acceleration =
-            recentGrowth - previousGrowth
+            recentGrowth -
+            previousGrowth
 
         let growthComponent =
             bounded(
@@ -538,9 +852,17 @@ final class MarketExhaustionEngine: ObservableObject {
         )
     }
 
+    // ========================================================
     // MARK: - Cellular Automaton Reset
+    // ========================================================
 
     func resetCells() {
+
+        // Reset deterministic random stream.
+        random =
+            SplitMix64(
+                seed: randomSeed
+            )
 
         cells.removeAll(
             keepingCapacity: true
@@ -551,16 +873,21 @@ final class MarketExhaustionEngine: ObservableObject {
             gridHeight
 
         guard count > 0 else {
+            yearlyRiskHistory.removeAll()
             return
         }
 
-        cells.reserveCapacity(count)
+        cells.reserveCapacity(
+            count
+        )
 
         for _ in 0..<count {
 
             let energyVariation =
-                (random.nextUnit() - 0.5) *
-                0.10
+                (
+                    random.nextUnit() -
+                    0.5
+                ) * 0.10
 
             let initialEnergy =
                 bounded(
@@ -570,22 +897,39 @@ final class MarketExhaustionEngine: ObservableObject {
 
             cells.append(
                 MarketCell(
-                    energy: initialEnergy,
-                    momentum: 0.0,
+                    energy:
+                        initialEnergy,
+
+                    momentum:
+                        0.0,
+
                     liquidity:
                         bounded(
                             parameters.initialLiquidity
                         ),
+
                     capital:
                         bounded(
                             parameters.initialCapital
                         ),
-                    exhaustion: 0.0,
-                    stress: 0.0,
-                    financialPotential: 0.0,
-                    contagion: 0.0,
-                    dissipation: 0.0,
-                    state: .stable
+
+                    exhaustion:
+                        0.0,
+
+                    stress:
+                        0.0,
+
+                    financialPotential:
+                        0.0,
+
+                    contagion:
+                        0.0,
+
+                    dissipation:
+                        0.0,
+
+                    state:
+                        .stable
                 )
             )
         }
@@ -593,14 +937,17 @@ final class MarketExhaustionEngine: ObservableObject {
         yearlyRiskHistory.removeAll()
     }
 
+    // ========================================================
     // MARK: - Neighbor Indices
+    // ========================================================
 
     private func neighborIndices(
         for index: Int
     ) -> [Int] {
 
         guard index >= 0,
-              index < cells.count else {
+              index < cells.count
+        else {
             return []
         }
 
@@ -610,13 +957,12 @@ final class MarketExhaustionEngine: ObservableObject {
         let y =
             index / gridWidth
 
-        var neighbors: [Int] = []
-
         let directions: [(Int, Int)]
 
         if parameters.diagonalNeighbors {
 
             directions = [
+
                 (-1, -1),
                 ( 0, -1),
                 ( 1, -1),
@@ -632,6 +978,7 @@ final class MarketExhaustionEngine: ObservableObject {
         } else {
 
             directions = [
+
                 ( 0, -1),
                 (-1,  0),
                 ( 1,  0),
@@ -639,15 +986,21 @@ final class MarketExhaustionEngine: ObservableObject {
             ]
         }
 
+        var neighbors: [Int] = []
+
         for (dx, dy) in directions {
 
-            let nx = x + dx
-            let ny = y + dy
+            let nx =
+                x + dx
+
+            let ny =
+                y + dy
 
             guard nx >= 0,
                   nx < gridWidth,
                   ny >= 0,
-                  ny < gridHeight else {
+                  ny < gridHeight
+            else {
                 continue
             }
 
@@ -659,184 +1012,95 @@ final class MarketExhaustionEngine: ObservableObject {
         return neighbors
     }
 
-    // MARK: - Average Neighbor Stress
-
-    private func averageNeighborStress(
-        index: Int,
-        snapshot: [MarketCell]
-    ) -> Double {
-
-        let neighbors =
-            neighborIndices(
-                for: index
-            )
-
-        guard !neighbors.isEmpty else {
-            return 0.0
-        }
-
-        var total = 0.0
-        var count = 0
-
-        for neighborIndex in neighbors {
-
-            guard neighborIndex >= 0,
-                  neighborIndex < snapshot.count else {
-                continue
-            }
-
-            let value =
-                snapshot[neighborIndex].stress
-
-            guard value.isFinite else {
-                continue
-            }
-
-            total += value
-            count += 1
-        }
-
-        guard count > 0 else {
-            return 0.0
-        }
-
-        return bounded(
-            total / Double(count)
-        )
-    }
-
+    // ========================================================
     // MARK: - Cellular Automaton Step
+    // ========================================================
 
-    /// Renamed from "step" to avoid conflict with simd module.
+    /// Advances exactly one synchronous CA generation.
     ///
-    /// Advances the cellular automaton by exactly one generation.
-    ///
-    /// All cells read exclusively from `previousCells`.
-    /// No cell can observe another cell's partially updated state.
-    ///
-    /// Macro inputs are normalized before entering the CA so that:
-    /// - money supply affects financial energy and momentum
-    /// - inflation creates resource pressure
-    /// - taxation removes available capital/liquidity
-    /// - economic growth supplies productive energy
-    /// - stock growth supplies momentum
-    /// - stock-growth slowdown creates stress
-    /// - bond yields create financing pressure
-    /// - banking stress depletes financial resources
-    /// - monetary policy affects expansion/contraction
-    /// - trading volume supplies market disturbance
-    /// - crash-cycle equilibrium supplies systemic pressure
-    /// - external shocks disturb energy and stress
+    /// Every cell reads only from previousCells.
     func stepCA(
         equilibriumPressure: Double,
         volumePressure: Double,
-        moneySupplyChangePercent: Double,
-        inflationPercent: Double,
-        taxationPercent: Double,
-        economicGrowthPercent: Double,
-        stockGrowthPercent: Double,
-        previousStockGrowthPercent: Double,
-        bondYieldAvgPercent: Double,
-        bankingCreditStressRating: Double,
-        moneyPolicyChangeImpact: Double,
-        externalShockPercent: Double
+        scenario: MarketScenario
     ) {
+
         guard !cells.isEmpty else {
             return
         }
 
-        // ------------------------------------------------------------
-        // IMPORTANT:
-        //
-        // Every cell reads from exactly the same previous generation.
-        // This guarantees synchronous CA behavior.
-        // ------------------------------------------------------------
+        let previousCells =
+            cells
 
-        let previousCells = cells
-
-        // ------------------------------------------------------------
-        // 1. NORMALIZE SYSTEM-LEVEL PRESSURES
-        // ------------------------------------------------------------
+        // ----------------------------------------------------
+        // 1. System pressures
+        // ----------------------------------------------------
 
         let normalizedEquilibrium =
-            bounded(equilibriumPressure)
+            bounded(
+                equilibriumPressure
+            )
 
         let normalizedVolume =
-            bounded(volumePressure)
+            bounded(
+                volumePressure
+            )
 
-        // ------------------------------------------------------------
-        // Money supply
-        //
-        // ±20% is treated as the strong model range.
-        //
-        // +5%  -> +0.25
-        // -5%  -> -0.25
-        // ------------------------------------------------------------
+        // ----------------------------------------------------
+        // 2. Macro normalization
+        // ----------------------------------------------------
 
+        // Money supply:
+        // ±20% = strong model range.
         let moneySupplyForcing =
             bounded(
-                moneySupplyChangePercent / 20.0,
+                scenario.moneySupplyChangePercent / 20.0,
                 minimum: -1.0,
                 maximum: 1.0
             )
 
-        // ------------------------------------------------------------
-        // Inflation
-        //
-        // 10% represents a strong inflationary condition.
-        // ------------------------------------------------------------
-
+        // Inflation:
+        // 10% = strong model range.
         let inflationForcing =
             bounded(
-                inflationPercent / 10.0
+                scenario.inflationPercent / 10.0
             )
 
-        // ------------------------------------------------------------
-        // Taxation
-        //
-        // 50% is treated as the strong model range.
-        // ------------------------------------------------------------
-
+        // Tax growth:
+        // -50%...+50% model range.
         let taxationForcing =
             bounded(
-                taxationPercent / 50.0
+                scenario.taxationPercent / 50.0,
+                minimum: -1.0,
+                maximum: 1.0
             )
 
-        // ------------------------------------------------------------
-        // Economic growth
-        //
-        // ±10% represents strong expansion/contraction.
-        // ------------------------------------------------------------
-
+        // Economic growth:
+        // ±15% gives more room than the previous ±10%
+        // historical dataset normalization.
         let growthForcing =
             bounded(
-                economicGrowthPercent / 10.0,
+                scenario.economicGrowthPercent / 15.0,
                 minimum: -1.0,
                 maximum: 1.0
             )
 
-        // ------------------------------------------------------------
-        // Stock growth
-        //
-        // ±50% represents strong market movement.
-        // ------------------------------------------------------------
-
+        // Stock growth:
+        // ±60% gives additional room for historical extremes.
         let stockGrowthForcing =
             bounded(
-                stockGrowthPercent / 50.0,
+                scenario.stockGrowthPercent / 60.0,
                 minimum: -1.0,
                 maximum: 1.0
             )
 
-        // ------------------------------------------------------------
+        // ----------------------------------------------------
         // Stock-growth slowdown
-        //
-        // A declining growth rate is itself a stress signal.
-        // ------------------------------------------------------------
+        // ----------------------------------------------------
 
         let stockGrowthChange =
-            stockGrowthPercent -
-            previousStockGrowthPercent
+            scenario.stockGrowthPercent -
+            scenario.previousStockGrowthPercent
 
         let stockGrowthSlowdown =
             bounded(
@@ -845,103 +1109,100 @@ final class MarketExhaustionEngine: ObservableObject {
                 maximum: 1.0
             )
 
-        // ------------------------------------------------------------
-        // Bond yield pressure
-        //
-        // 10% is treated as a strong financing-pressure condition.
-        // ------------------------------------------------------------
+        // ----------------------------------------------------
+        // Bond yields
+        // ----------------------------------------------------
 
         let bondYieldPressure =
             bounded(
-                bondYieldAvgPercent / 10.0
+                scenario.bondYieldAvgPercent / 10.0
             )
 
-        // ------------------------------------------------------------
-        // Banking / credit stress
+        // ----------------------------------------------------
+        // Banking stress
         //
-        // Expected UI range: 0...5.
-        // ------------------------------------------------------------
+        // Historical JSON uses approximately 0...10.
+        // ----------------------------------------------------
 
         let bankingStress =
             bounded(
-                bankingCreditStressRating / 5.0
+                scenario.bankingCreditStressRating / 10.0
             )
 
-        // ------------------------------------------------------------
+        // ----------------------------------------------------
         // Monetary policy
         //
-        // Positive = expansionary
-        // Negative = contractionary
-        //
-        // Expected model range approximately -1...+1.
-        // ------------------------------------------------------------
+        // Historical JSON uses approximately -10...+10.
+        // ----------------------------------------------------
 
         let policyForcing =
             bounded(
-                moneyPolicyChangeImpact,
+                scenario.moneyPolicyChangeImpact / 10.0,
                 minimum: -1.0,
                 maximum: 1.0
             )
 
-        // ------------------------------------------------------------
-        // External shock
-        //
-        // 20% is treated as a very strong disturbance.
-        // Magnitude is used because a shock is destabilizing regardless
-        // of whether its raw sign is positive or negative.
-        // ------------------------------------------------------------
+        // ----------------------------------------------------
+        // External shock magnitude
+        // ----------------------------------------------------
 
         let externalShock =
             bounded(
-                abs(externalShockPercent) / 20.0
+                abs(
+                    scenario.externalShockMagnitudePercent
+                ) / 20.0
             )
 
-        // ------------------------------------------------------------
-        // 2. BASE MARKET FORCING
-        // ------------------------------------------------------------
+        // ----------------------------------------------------
+        // 3. Base market forcing
+        // ----------------------------------------------------
 
         let externalForcing =
             bounded(
                 parameters.equilibriumWeight *
-                    normalizedEquilibrium
+                normalizedEquilibrium
                 +
                 parameters.volumeWeight *
-                    normalizedVolume
+                normalizedVolume
             )
 
-        // ------------------------------------------------------------
-        // 3. MACROECONOMIC ENERGY FORCING
-        //
-        // Expansion:
-        //   money supply
-        //   economic growth
-        //   stock growth
-        //   monetary policy
-        //
-        // Contraction:
-        //   monetary tightening
-        //   inflation
-        //   taxation
-        //   bond yields
-        //   banking stress
-        //   external shock
-        // ------------------------------------------------------------
+        // ----------------------------------------------------
+        // 4. Macro energy
+        // ----------------------------------------------------
 
         let expansionaryEnergy =
-            max(moneySupplyForcing, 0.0) * 0.30
+            max(
+                moneySupplyForcing,
+                0.0
+            ) * 0.30
             +
-            max(growthForcing, 0.0) * 0.20
+            max(
+                growthForcing,
+                0.0
+            ) * 0.20
             +
-            max(stockGrowthForcing, 0.0) * 0.10
+            max(
+                stockGrowthForcing,
+                0.0
+            ) * 0.10
             +
-            max(policyForcing, 0.0) * 0.10
+            max(
+                policyForcing,
+                0.0
+            ) * 0.10
 
         let contractionaryEnergy =
-            max(-moneySupplyForcing, 0.0) * 0.25
+            max(
+                -moneySupplyForcing,
+                0.0
+            ) * 0.25
             +
             inflationForcing * 0.10
             +
-            taxationForcing * 0.10
+            max(
+                taxationForcing,
+                0.0
+            ) * 0.10
             +
             bondYieldPressure * 0.15
             +
@@ -957,12 +1218,9 @@ final class MarketExhaustionEngine: ObservableObject {
                 maximum: 1.0
             )
 
-        // ------------------------------------------------------------
-        // 4. MACROECONOMIC MOMENTUM
-        //
-        // Money supply and growth create directional momentum.
-        // Slowdown, yields, banking stress and shocks oppose it.
-        // ------------------------------------------------------------
+        // ----------------------------------------------------
+        // 5. Macro momentum
+        // ----------------------------------------------------
 
         let expansionaryMomentum =
             moneySupplyForcing * 0.35
@@ -974,7 +1232,10 @@ final class MarketExhaustionEngine: ObservableObject {
             policyForcing * 0.10
 
         let contractionaryMomentum =
-            stockGrowthSlowdown * 0.20
+            max(
+                stockGrowthSlowdown,
+                0.0
+            ) * 0.20
             +
             bondYieldPressure * 0.15
             +
@@ -990,45 +1251,59 @@ final class MarketExhaustionEngine: ObservableObject {
                 maximum: 1.0
             )
 
-        // ------------------------------------------------------------
-        // 5. MACROECONOMIC STRESS
-        // ------------------------------------------------------------
+        // ----------------------------------------------------
+        // 6. Macro stress
+        // ----------------------------------------------------
 
         let macroStressForcing =
             bounded(
                 inflationForcing * 0.15
                 +
-                taxationForcing * 0.10
+                max(
+                    taxationForcing,
+                    0.0
+                ) * 0.10
                 +
                 bondYieldPressure * 0.15
                 +
                 bankingStress * 0.20
                 +
-                stockGrowthSlowdown * 0.15
+                max(
+                    stockGrowthSlowdown,
+                    0.0
+                ) * 0.15
                 +
                 externalShock * 0.20
                 +
-                max(-growthForcing, 0.0) * 0.10
+                max(
+                    -growthForcing,
+                    0.0
+                ) * 0.10
             )
 
-        // ------------------------------------------------------------
-        // 6. SYNCHRONOUS CELL UPDATE
-        // ------------------------------------------------------------
+        // ====================================================
+        // 7. Synchronous CA update
+        // ====================================================
 
         for index in previousCells.indices {
 
             let previous =
                 previousCells[index]
 
-            // --------------------------------------------------------
+            // ------------------------------------------------
             // Neighbor field
-            // --------------------------------------------------------
+            // ------------------------------------------------
 
             let neighbors =
-                neighborIndices(for: index)
+                neighborIndices(
+                    for: index
+                )
 
             let neighborCount =
-                max(neighbors.count, 1)
+                max(
+                    neighbors.count,
+                    1
+                )
 
             var neighborEnergy = 0.0
             var neighborMomentum = 0.0
@@ -1044,7 +1319,9 @@ final class MarketExhaustionEngine: ObservableObject {
                 }
 
                 let neighbor =
-                    previousCells[neighborIndex]
+                    previousCells[
+                        neighborIndex
+                    ]
 
                 neighborEnergy +=
                     neighbor.energy
@@ -1071,12 +1348,9 @@ final class MarketExhaustionEngine: ObservableObject {
             neighborStress /=
                 Double(neighborCount)
 
-            // --------------------------------------------------------
-            // 7. ENERGY TRANSFER BETWEEN NEIGHBORS
-            //
-            // Energy flows toward a cell when neighboring cells contain
-            // greater available financial energy.
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Energy transfer
+            // ------------------------------------------------
 
             let energyGradient =
                 neighborEnergy -
@@ -1086,35 +1360,33 @@ final class MarketExhaustionEngine: ObservableObject {
                 energyGradient *
                 parameters.energyTransferRate
 
-            // --------------------------------------------------------
-            // 8. MONEY-SUPPLY ENERGY
-            //
-            // This is the explicit money-supply -> CA pathway.
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Money supply energy
+            // ------------------------------------------------
 
             let monetaryEnergy =
                 moneySupplyForcing *
                 parameters.moneySupplyEnergyWeight
 
-            // --------------------------------------------------------
-            // 9. ECONOMIC GROWTH ENERGY
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Economic growth energy
+            // ------------------------------------------------
 
             let growthEnergy =
                 growthForcing *
                 parameters.economicGrowthEnergyWeight
 
-            // --------------------------------------------------------
-            // 10. EXTERNAL SHOCK ENERGY
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // External shock energy
+            // ------------------------------------------------
 
             let disturbanceEnergy =
                 externalShock *
                 parameters.externalShockEnergyWeight
 
-            // --------------------------------------------------------
-            // 11. BASE ENERGY INJECTION
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Base injection
+            // ------------------------------------------------
 
             let baseInjectedEnergy =
                 externalForcing *
@@ -1124,17 +1396,17 @@ final class MarketExhaustionEngine: ObservableObject {
                 macroEnergyForcing *
                 parameters.macroEnergyInjectionRate
 
-            // --------------------------------------------------------
-            // 12. RETAINED ENERGY
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Retained energy
+            // ------------------------------------------------
 
             let retainedEnergy =
                 previous.energy *
                 parameters.energyRetention
 
-            // --------------------------------------------------------
-            // 13. PRELIMINARY ENERGY
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Preliminary energy
+            // ------------------------------------------------
 
             let preliminaryEnergy =
                 retainedEnergy
@@ -1151,38 +1423,42 @@ final class MarketExhaustionEngine: ObservableObject {
                 -
                 disturbanceEnergy
 
-            // --------------------------------------------------------
-            // 14. ENERGY CHANGE
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Energy change
+            // ------------------------------------------------
 
             let directionalChange =
                 preliminaryEnergy -
                 previous.energy
 
-            // --------------------------------------------------------
-            // 15. PRELIMINARY MOMENTUM
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Momentum
+            // ------------------------------------------------
 
             let preliminaryMomentum =
                 previous.momentum *
-                    parameters.momentumRetention
+                parameters.momentumRetention
                 +
                 directionalChange *
-                    parameters.momentumResponse
+                parameters.momentumResponse
                 +
                 macroMomentumForcing *
-                    parameters.macroMomentumResponse
+                parameters.macroMomentumResponse
 
-            // --------------------------------------------------------
-            // 16. FINANCIAL POTENTIAL
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Financial potential
+            // ------------------------------------------------
 
             let energyPotential =
-                bounded(preliminaryEnergy) *
+                bounded(
+                    preliminaryEnergy
+                ) *
                 parameters.potentialEnergyWeight
 
             let momentumPotential =
-                abs(preliminaryMomentum) *
+                abs(
+                    preliminaryMomentum
+                ) *
                 parameters.potentialMomentumWeight
 
             let rawPotential =
@@ -1193,11 +1469,13 @@ final class MarketExhaustionEngine: ObservableObject {
                 parameters.potentialGain
 
             let localPotential =
-                bounded(rawPotential)
+                bounded(
+                    rawPotential
+                )
 
-            // --------------------------------------------------------
-            // 17. FINANCIAL-POTENTIAL GRADIENT
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Potential gradient
+            // ------------------------------------------------
 
             let potentialGradient =
                 neighborPotential -
@@ -1207,9 +1485,9 @@ final class MarketExhaustionEngine: ObservableObject {
                 potentialGradient *
                 parameters.potentialGradientResponse
 
-            // --------------------------------------------------------
-            // 18. NEIGHBOR MOMENTUM PROPAGATION
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Momentum propagation
+            // ------------------------------------------------
 
             let momentumGradient =
                 neighborMomentum -
@@ -1221,27 +1499,30 @@ final class MarketExhaustionEngine: ObservableObject {
                 potentialMomentum
                 +
                 momentumGradient *
-                    parameters.momentumTransferRate
+                parameters.momentumTransferRate
 
-            // --------------------------------------------------------
-            // 19. LIQUIDITY DEPLETION
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Liquidity depletion
+            // ------------------------------------------------
 
             let liquidityPressure =
                 localPotential *
-                    parameters.liquidityDepletionRate
+                parameters.liquidityDepletionRate
                 +
                 inflationForcing *
-                    parameters.inflationLiquidityRate
+                parameters.inflationLiquidityRate
                 +
                 bondYieldPressure *
-                    parameters.bondYieldLiquidityRate
+                parameters.bondYieldLiquidityRate
                 +
                 bankingStress *
-                    parameters.bankingLiquidityRate
+                parameters.bankingLiquidityRate
                 +
-                taxationForcing *
-                    parameters.taxLiquidityRate
+                max(
+                    taxationForcing,
+                    0.0
+                ) *
+                parameters.taxLiquidityRate
 
             let newLiquidity =
                 bounded(
@@ -1249,22 +1530,25 @@ final class MarketExhaustionEngine: ObservableObject {
                     liquidityPressure
                 )
 
-            // --------------------------------------------------------
-            // 20. CAPITAL DEPLETION
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Capital depletion
+            // ------------------------------------------------
 
             let capitalPressure =
                 localPotential *
-                    parameters.capitalDepletionRate
+                parameters.capitalDepletionRate
                 +
-                taxationForcing *
-                    parameters.taxCapitalRate
+                max(
+                    taxationForcing,
+                    0.0
+                ) *
+                parameters.taxCapitalRate
                 +
                 bankingStress *
-                    parameters.bankingCapitalRate
+                parameters.bankingCapitalRate
                 +
                 externalShock *
-                    parameters.externalShockCapitalRate
+                parameters.externalShockCapitalRate
 
             let newCapital =
                 bounded(
@@ -1272,9 +1556,9 @@ final class MarketExhaustionEngine: ObservableObject {
                     capitalPressure
                 )
 
-            // --------------------------------------------------------
-            // 21. RESOURCE DEPLETION
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Resource depletion
+            // ------------------------------------------------
 
             let resourceDepletion =
                 bounded(
@@ -1285,25 +1569,27 @@ final class MarketExhaustionEngine: ObservableObject {
                         0.40 * newCapital
                         +
                         0.20 *
-                            bounded(
-                                preliminaryEnergy
-                            )
+                        bounded(
+                            preliminaryEnergy
+                        )
                     )
                 )
 
-            // --------------------------------------------------------
-            // 22. DIRECT ENERGY DEPLETION
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Direct energy depletion
+            // ------------------------------------------------
 
             let energyDepletion =
                 bounded(
                     1.0 -
-                    bounded(preliminaryEnergy)
+                    bounded(
+                        preliminaryEnergy
+                    )
                 )
 
-            // --------------------------------------------------------
-            // 23. EXHAUSTION
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Exhaustion
+            // ------------------------------------------------
 
             let exhaustionPressure =
                 bounded(
@@ -1322,26 +1608,29 @@ final class MarketExhaustionEngine: ObservableObject {
                 recovery
                 +
                 exhaustionPressure *
-                    parameters.exhaustionAccumulationRate
+                parameters.exhaustionAccumulationRate
                 +
                 macroStressForcing *
-                    parameters.macroExhaustionRate
+                parameters.macroExhaustionRate
 
             let newExhaustion =
                 bounded(
                     accumulatedExhaustion
                 )
 
-            // --------------------------------------------------------
-            // 24. CONTAGION
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Contagion
+            // ------------------------------------------------
 
             let stressGradient =
                 neighborStress -
                 previous.stress
 
             let contagionInput =
-                max(stressGradient, 0.0)
+                max(
+                    stressGradient,
+                    0.0
+                )
                 +
                 neighborStress * 0.50
 
@@ -1351,9 +1640,9 @@ final class MarketExhaustionEngine: ObservableObject {
                     parameters.contagionRate
                 )
 
-            // --------------------------------------------------------
-            // 25. DISSIPATION
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Dissipation
+            // ------------------------------------------------
 
             let rawDissipation =
                 previous.stress *
@@ -1364,9 +1653,9 @@ final class MarketExhaustionEngine: ObservableObject {
                     rawDissipation
                 )
 
-            // --------------------------------------------------------
-            // 26. DISSIPATION REMOVES ENERGY
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Dissipation removes energy
+            // ------------------------------------------------
 
             let dissipatedEnergy =
                 newDissipation *
@@ -1378,9 +1667,9 @@ final class MarketExhaustionEngine: ObservableObject {
                     dissipatedEnergy
                 )
 
-            // --------------------------------------------------------
-            // 27. FINAL ENERGY DEPLETION
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Final energy depletion
+            // ------------------------------------------------
 
             let finalEnergyDepletion =
                 bounded(
@@ -1388,19 +1677,18 @@ final class MarketExhaustionEngine: ObservableObject {
                     finalEnergy
                 )
 
-            // --------------------------------------------------------
-            // 28. STRESS
-            //
-            // High available energy is not inherently stress.
-            // Depletion is what creates energy-related stress.
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Stress
+            // ------------------------------------------------
 
             let stressFromEnergy =
                 finalEnergyDepletion *
                 parameters.energyDepletionStressWeight
 
             let stressFromMomentum =
-                abs(newMomentum) *
+                abs(
+                    newMomentum
+                ) *
                 parameters.momentumWeight
 
             let stressFromPotential =
@@ -1440,9 +1728,9 @@ final class MarketExhaustionEngine: ObservableObject {
                 -
                 newDissipation
 
-            // --------------------------------------------------------
-            // 29. STOCHASTIC PERTURBATION
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Stochastic perturbation
+            // ------------------------------------------------
 
             let noise =
                 (
@@ -1457,14 +1745,9 @@ final class MarketExhaustionEngine: ObservableObject {
                     noise
                 )
 
-            // --------------------------------------------------------
-            // 30. STATE TRANSITION
-            //
-            // A cell can enter crashed state through either:
-            //
-            // A. critical systemic stress
-            // B. severe remaining-energy depletion
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // State transition
+            // ------------------------------------------------
 
             let severeEnergyDepletion =
                 finalEnergy <=
@@ -1497,17 +1780,13 @@ final class MarketExhaustionEngine: ObservableObject {
                 newState = .stable
             }
 
-            // --------------------------------------------------------
-            // 31. SYNCHRONOUS COMMIT
-            // --------------------------------------------------------
+            // ------------------------------------------------
+            // Commit
+            // ------------------------------------------------
 
             cells[index].energy =
                 finalEnergy
 
-            // Momentum is directional persistence and must keep its
-            // sign; only its magnitude (used above for stress) is
-            // unsigned. Bound to [-1, 1] rather than clamping to
-            // [0, 1] via abs(), which would erase direction.
             cells[index].momentum =
                 bounded(
                     newMomentum,
@@ -1540,7 +1819,73 @@ final class MarketExhaustionEngine: ObservableObject {
                 newState
         }
     }
+
+    // ========================================================
+    // MARK: - Backward-Compatible stepCA
+    // ========================================================
+
+    /// Retained so existing callers do not break.
+    func stepCA(
+        equilibriumPressure: Double,
+        volumePressure: Double,
+        moneySupplyChangePercent: Double,
+        inflationPercent: Double,
+        taxationPercent: Double,
+        economicGrowthPercent: Double,
+        stockGrowthPercent: Double,
+        previousStockGrowthPercent: Double,
+        bondYieldAvgPercent: Double,
+        bankingCreditStressRating: Double,
+        moneyPolicyChangeImpact: Double,
+        externalShockPercent: Double
+    ) {
+
+        let scenario =
+            MarketScenario(
+                moneySupplyChangePercent:
+                    moneySupplyChangePercent,
+
+                inflationPercent:
+                    inflationPercent,
+
+                taxationPercent:
+                    taxationPercent,
+
+                economicGrowthPercent:
+                    economicGrowthPercent,
+
+                stockGrowthPercent:
+                    stockGrowthPercent,
+
+                previousStockGrowthPercent:
+                    previousStockGrowthPercent,
+
+                bondYieldAvgPercent:
+                    bondYieldAvgPercent,
+
+                bankingCreditStressRating:
+                    bankingCreditStressRating,
+
+                moneyPolicyChangeImpact:
+                    moneyPolicyChangeImpact,
+
+                externalShockMagnitudePercent:
+                    externalShockPercent
+            )
+
+        stepCA(
+            equilibriumPressure:
+                equilibriumPressure,
+            volumePressure:
+                volumePressure,
+            scenario:
+                scenario
+        )
+    }
+
+    // ========================================================
     // MARK: - State Classification
+    // ========================================================
 
     private func stateForStress(
         _ stress: Double
@@ -1568,68 +1913,96 @@ final class MarketExhaustionEngine: ObservableObject {
         return .stable
     }
 
+    // ========================================================
     // MARK: - Run
+    // ========================================================
 
+    /// Runs the requested number of generations using one
+    /// explicit scenario.
     func run(
         years: Int,
         equilibriumPressure: Double,
-        volumePressure: Double
+        volumePressure: Double,
+        scenario: MarketScenario
     ) {
 
         guard years > 0 else {
             return
         }
 
-        // TODO: Replace these 0.0 placeholders with real scenario values.
         for _ in 0..<years {
 
             stepCA(
-                equilibriumPressure: equilibriumPressure,
-                volumePressure: volumePressure,
-                moneySupplyChangePercent: 0.0,         // TODO: provide scenario value
-                inflationPercent: 0.0,                 // TODO: provide scenario value
-                taxationPercent: 0.0,                  // TODO: provide scenario value
-                economicGrowthPercent: 0.0,            // TODO: provide scenario value
-                stockGrowthPercent: 0.0,               // TODO: provide scenario value
-                previousStockGrowthPercent: 0.0,       // TODO: provide scenario value
-                bondYieldAvgPercent: 0.0,              // TODO: provide scenario value
-                bankingCreditStressRating: 0.0,        // TODO: provide scenario value
-                moneyPolicyChangeImpact: 0.0,          // TODO: provide scenario value
-                externalShockPercent: 0.0              // TODO: provide scenario value
+                equilibriumPressure:
+                    equilibriumPressure,
+
+                volumePressure:
+                    volumePressure,
+
+                scenario:
+                    scenario
             )
         }
     }
 
+    /// Backward-compatible run.
+    ///
+    /// Unlike the previous implementation this no longer feeds
+    /// eleven unexplained literal zeroes into stepCA().
+    ///
+    /// A caller that has no macro scenario explicitly receives
+    /// a neutral scenario.
+    func run(
+        years: Int,
+        equilibriumPressure: Double,
+        volumePressure: Double
+    ) {
+
+        run(
+            years:
+                years,
+
+            equilibriumPressure:
+                equilibriumPressure,
+
+            volumePressure:
+                volumePressure,
+
+            scenario:
+                MarketScenario()
+        )
+    }
+
+    // ========================================================
     // MARK: - Run One Year
+    // ========================================================
 
     func runYear(
         year: Int,
         equilibriumPressure: Double,
-        volumePressure: Double
+        volumePressure: Double,
+        scenario: MarketScenario
     ) {
 
         stepCA(
             equilibriumPressure:
                 equilibriumPressure,
+
             volumePressure:
                 volumePressure,
-            moneySupplyChangePercent: 0.0,
-            inflationPercent: 0.0,
-            taxationPercent: 0.0,
-            economicGrowthPercent: 0.0,
-            stockGrowthPercent: 0.0,
-            previousStockGrowthPercent: 0.0,
-            bondYieldAvgPercent: 0.0,
-            bankingCreditStressRating: 0.0,
-            moneyPolicyChangeImpact: 0.0,
-            externalShockPercent: 0.0
+
+            scenario:
+                scenario
         )
 
         let snapshot =
             makeYearlyRiskSnapshot(
-                year: year,
+                year:
+                    year,
+
                 equilibriumPressure:
                     equilibriumPressure,
+
                 volumePressure:
                     volumePressure
             )
@@ -1639,7 +2012,31 @@ final class MarketExhaustionEngine: ObservableObject {
         )
     }
 
+    /// Backward-compatible neutral-scenario overload.
+    func runYear(
+        year: Int,
+        equilibriumPressure: Double,
+        volumePressure: Double
+    ) {
+
+        runYear(
+            year:
+                year,
+
+            equilibriumPressure:
+                equilibriumPressure,
+
+            volumePressure:
+                volumePressure,
+
+            scenario:
+                MarketScenario()
+        )
+    }
+
+    // ========================================================
     // MARK: - Cellular Metrics
+    // ========================================================
 
     func cellularStress() -> Double {
 
@@ -1683,8 +2080,6 @@ final class MarketExhaustionEngine: ObservableObject {
             return 0.0
         }
 
-        // Momentum is signed; bound to [-1, 1] instead of the
-        // default [0, 1] so a negative average isn't clamped to 0.
         return bounded(
             cells.reduce(
                 0.0
@@ -1766,6 +2161,14 @@ final class MarketExhaustionEngine: ObservableObject {
         )
     }
 
+    // ========================================================
+    // MARK: - State Fractions
+    // ========================================================
+
+    /// Only .critical cells.
+    ///
+    /// Crashed cells are deliberately excluded so that the
+    /// critical and crashed populations are mutually exclusive.
     func criticalCellFraction() -> Double {
 
         guard !cells.isEmpty else {
@@ -1774,8 +2177,7 @@ final class MarketExhaustionEngine: ObservableObject {
 
         let critical =
             cells.filter {
-                $0.state == .critical ||
-                $0.state == .crashed
+                $0.state == .critical
             }.count
 
         return safeDivide(
@@ -1784,6 +2186,7 @@ final class MarketExhaustionEngine: ObservableObject {
         )
     }
 
+    /// Only .crashed cells.
     func crashCellFraction() -> Double {
 
         guard !cells.isEmpty else {
@@ -1801,7 +2204,32 @@ final class MarketExhaustionEngine: ObservableObject {
         )
     }
 
+    /// Critical + crashed.
+    ///
+    /// This is available separately so callers that want the
+    /// broader distressed population do not overload the meaning
+    /// of criticalCellFraction().
+    func distressedCellFraction() -> Double {
+
+        guard !cells.isEmpty else {
+            return 0.0
+        }
+
+        let distressed =
+            cells.filter {
+                $0.state == .critical ||
+                $0.state == .crashed
+            }.count
+
+        return safeDivide(
+            Double(distressed),
+            Double(cells.count)
+        )
+    }
+
+    // ========================================================
     // MARK: - Systemic Risk
+    // ========================================================
 
     func systemicRisk() -> Double {
 
@@ -1817,10 +2245,19 @@ final class MarketExhaustionEngine: ObservableObject {
         let exhaustion =
             averageExhaustion()
 
+        // These are mutually exclusive state populations.
+        //
+        // 35% average cell stress
+        // 25% critical population
+        // 25% crashed population
+        // 15% exhaustion
         let risk =
-            0.35 * stress +
-            0.25 * critical +
-            0.25 * crashed +
+            0.35 * stress
+            +
+            0.25 * critical
+            +
+            0.25 * crashed
+            +
             0.15 * exhaustion
 
         return bounded(risk)
@@ -1828,15 +2265,14 @@ final class MarketExhaustionEngine: ObservableObject {
 
     func riskLevel() -> MarketState {
 
-        let risk =
+        stateForStress(
             systemicRisk()
-
-        return stateForStress(
-            risk
         )
     }
 
+    // ========================================================
     // MARK: - Yearly Snapshot
+    // ========================================================
 
     func makeYearlyRiskSnapshot(
         year: Int,
@@ -1845,41 +2281,58 @@ final class MarketExhaustionEngine: ObservableObject {
     ) -> YearlyRiskSnapshot {
 
         YearlyRiskSnapshot(
-            year: year,
+
+            year:
+                year,
+
             equilibriumPressure:
                 bounded(
                     equilibriumPressure
                 ),
+
             volumePressure:
                 bounded(
                     volumePressure
                 ),
+
             averageEnergy:
                 averageEnergy(),
+
             averageMomentum:
                 averageMomentum(),
+
             averageFinancialPotential:
                 averageFinancialPotential(),
+
             averageLiquidity:
                 averageLiquidity(),
+
             averageCapital:
                 averageCapital(),
+
             averageExhaustion:
                 averageExhaustion(),
+
             averageStress:
                 cellularStress(),
+
             criticalFraction:
                 criticalCellFraction(),
+
             crashFraction:
                 crashCellFraction(),
+
             systemicRisk:
                 systemicRisk(),
+
             riskLevel:
                 riskLevel()
         )
     }
 
+    // ========================================================
     // MARK: - Historical Anchor
+    // ========================================================
 
     private func historicalCrashIndex(
         for year: Int
@@ -1892,7 +2345,9 @@ final class MarketExhaustionEngine: ObservableObject {
         )
     }
 
-    // MARK: - Corrected Analysis Pipeline
+    // ========================================================
+    // MARK: - Current Analysis
+    // ========================================================
 
     func analyze(
         currentYear: Int,
@@ -1902,28 +2357,22 @@ final class MarketExhaustionEngine: ObservableObject {
 
         resetCells()
 
-        // --------------------------------------------------------
-        // IMPORTANT HISTORICAL-CAUSALITY RULE
-        //
-        // Find the most recent crash that existed at the time
-        // being analyzed.
-        //
-        // A 1937 analysis cannot use 2008 or 2022.
-        // A 2008 analysis cannot use 2020 or 2022.
-        // A 2025 analysis may use 2022 because 2022 is historical
-        // relative to 2025.
-        // --------------------------------------------------------
+        // ----------------------------------------------------
+        // Historical crash anchor
+        // ----------------------------------------------------
 
         let historicalIndex =
             historicalCrashIndex(
-                for: currentYear
+                for:
+                    currentYear
             )
 
         let anchorYear =
             historicalIndex.map {
                 crashRecords[$0].year
             }
-            ?? currentYear
+            ??
+            currentYear
 
         let yearsSinceCrash =
             max(
@@ -1932,16 +2381,17 @@ final class MarketExhaustionEngine: ObservableObject {
                 0
             )
 
-        // --------------------------------------------------------
-        // Alpha is estimated only through the historical anchor.
-        // --------------------------------------------------------
+        // ----------------------------------------------------
+        // Cycle-pressure exponent
+        // ----------------------------------------------------
 
         let alpha: Double
 
-        if let index = historicalIndex {
+        if let index =
+            historicalIndex {
 
             alpha =
-                estimatePowerLawAlpha(
+                estimateCyclePressureExponent(
                     upThroughCrashIndex:
                         index
                 )
@@ -1951,13 +2401,14 @@ final class MarketExhaustionEngine: ObservableObject {
             alpha = 2.0
         }
 
-        // --------------------------------------------------------
-        // Intervals are also restricted to the historical anchor.
-        // --------------------------------------------------------
+        // ----------------------------------------------------
+        // Historical intervals
+        // ----------------------------------------------------
 
         let intervals: [Double]
 
-        if let index = historicalIndex {
+        if let index =
+            historicalIndex {
 
             intervals =
                 crashIntervals(
@@ -1970,28 +2421,25 @@ final class MarketExhaustionEngine: ObservableObject {
             intervals = []
         }
 
-        // --------------------------------------------------------
+        // ----------------------------------------------------
         // Equilibrium pressure
-        // --------------------------------------------------------
+        // ----------------------------------------------------
 
         let equilibrium =
             powerLawPressure(
                 yearsSinceCrash:
                     yearsSinceCrash,
+
                 alpha:
                     alpha,
+
                 intervals:
                     intervals
             )
 
-        // --------------------------------------------------------
+        // ----------------------------------------------------
         // Volume pressure
-        //
-        // Explicit current points take precedence.
-        //
-        // Otherwise use historical records only through the
-        // selected historical anchor.
-        // --------------------------------------------------------
+        // ----------------------------------------------------
 
         let volume: Double
 
@@ -2003,32 +2451,51 @@ final class MarketExhaustionEngine: ObservableObject {
                         currentVolumePoints
                 )
 
-        } else if let index = historicalIndex {
+        } else {
 
             volume =
                 historicalVolumePressure(
-                    crashIndex:
-                        index
-            )
-
-        } else {
-
-            volume = 0.0
+                    forYear:
+                        currentYear
+                )
         }
 
-        // --------------------------------------------------------
-        // One CA generation represents the analyzed year.
-        // --------------------------------------------------------
+        // ----------------------------------------------------
+        // IMPORTANT:
+        //
+        // Macro inputs now come from the historical dataset.
+        // ----------------------------------------------------
+
+        let scenario =
+            historicalScenario(
+                for:
+                    currentYear
+            )
+
+        // ----------------------------------------------------
+        // One generation = analyzed year.
+        // ----------------------------------------------------
 
         runYear(
-            year: currentYear,
+            year:
+                currentYear,
+
             equilibriumPressure:
                 equilibrium,
+
             volumePressure:
-                volume
+                volume,
+
+            scenario:
+                scenario
         )
 
+        // ----------------------------------------------------
+        // Result
+        // ----------------------------------------------------
+
         return MarketRiskResult(
+
             year:
                 currentYear,
 
@@ -2073,14 +2540,17 @@ final class MarketExhaustionEngine: ObservableObject {
         )
     }
 
+    // ========================================================
     // MARK: - Historical Crash Analysis
+    // ========================================================
 
     func analyzeHistoricalCrash(
         at crashIndex: Int
     ) -> MarketRiskResult? {
 
         guard crashIndex >= 0,
-              crashIndex < crashRecords.count else {
+              crashIndex < crashRecords.count
+        else {
             return nil
         }
 
@@ -2089,19 +2559,16 @@ final class MarketExhaustionEngine: ObservableObject {
         let record =
             crashRecords[crashIndex]
 
-        // --------------------------------------------------------
+        // ----------------------------------------------------
         // First crash has no prior crash interval.
-        // --------------------------------------------------------
+        // ----------------------------------------------------
 
         guard crashIndex > 0 else {
 
-            let result =
-                analyze(
-                    currentYear:
-                        record.year
-                )
-
-            return result
+            return analyze(
+                currentYear:
+                    record.year
+            )
         }
 
         let previousRecord =
@@ -2117,7 +2584,7 @@ final class MarketExhaustionEngine: ObservableObject {
             )
 
         let alpha =
-            estimatePowerLawAlpha(
+            estimateCyclePressureExponent(
                 upThroughCrashIndex:
                     crashIndex
             )
@@ -2128,19 +2595,18 @@ final class MarketExhaustionEngine: ObservableObject {
                     crashIndex
             )
 
-        let volume =
-            historicalVolumePressure(
-                crashIndex:
-                    crashIndex
-            )
-
-        // --------------------------------------------------------
-        // Simulate every year between the preceding crash and
-        // the selected crash.
+        // ----------------------------------------------------
+        // Simulate each year separately.
         //
-        // This produces an actual evolving CA rather than
-        // evaluating only the terminal year.
-        // --------------------------------------------------------
+        // Each year gets:
+        //
+        // 1. Its own cycle pressure.
+        // 2. Its own historical macro scenario.
+        // 3. Volume information available at that year.
+        //
+        // No terminal crash information is retroactively
+        // applied to every preceding year.
+        // ----------------------------------------------------
 
         for offset in 1...intervalYears {
 
@@ -2159,38 +2625,65 @@ final class MarketExhaustionEngine: ObservableObject {
                 powerLawPressure(
                     yearsSinceCrash:
                         yearsSinceCrash,
+
                     alpha:
                         alpha,
+
                     intervals:
                         intervals
+                )
+
+            let volume =
+                historicalVolumePressure(
+                    forYear:
+                        year
+                )
+
+            let scenario =
+                historicalScenario(
+                    for:
+                        year
                 )
 
             runYear(
                 year:
                     year,
+
                 equilibriumPressure:
                     equilibrium,
+
                 volumePressure:
-                    volume
+                    volume,
+
+                scenario:
+                    scenario
             )
         }
 
-        // --------------------------------------------------------
-        // Return the terminal state for the selected historical
-        // crash.
-        // --------------------------------------------------------
+        // ----------------------------------------------------
+        // Terminal pressure
+        // ----------------------------------------------------
 
         let terminalEquilibrium =
             powerLawPressure(
                 yearsSinceCrash:
                     intervalYears,
+
                 alpha:
                     alpha,
+
                 intervals:
                     intervals
             )
 
+        let terminalVolume =
+            historicalVolumePressure(
+                forYear:
+                    record.year
+            )
+
         return MarketRiskResult(
+
             year:
                 record.year,
 
@@ -2198,7 +2691,7 @@ final class MarketExhaustionEngine: ObservableObject {
                 terminalEquilibrium,
 
             volumePressure:
-                volume,
+                terminalVolume,
 
             averageEnergy:
                 averageEnergy(),
@@ -2235,7 +2728,142 @@ final class MarketExhaustionEngine: ObservableObject {
         )
     }
 
+    // ========================================================
+    // MARK: - Explicit Scenario Analysis
+    // ========================================================
+
+    /// Allows the UI or a controlled experiment to run the CA
+    /// using explicitly supplied macroeconomic values.
+    func analyze(
+        currentYear: Int,
+        volumePressure: Double,
+        scenario: MarketScenario
+    ) -> MarketRiskResult {
+
+        resetCells()
+
+        let historicalIndex =
+            historicalCrashIndex(
+                for:
+                    currentYear
+            )
+
+        let anchorYear =
+            historicalIndex.map {
+                crashRecords[$0].year
+            }
+            ??
+            currentYear
+
+        let yearsSinceCrash =
+            max(
+                currentYear -
+                anchorYear,
+                0
+            )
+
+        let alpha: Double
+
+        let intervals: [Double]
+
+        if let index =
+            historicalIndex {
+
+            alpha =
+                estimateCyclePressureExponent(
+                    upThroughCrashIndex:
+                        index
+                )
+
+            intervals =
+                crashIntervals(
+                    upThroughCrashIndex:
+                        index
+                )
+
+        } else {
+
+            alpha = 2.0
+            intervals = []
+        }
+
+        let equilibrium =
+            powerLawPressure(
+                yearsSinceCrash:
+                    yearsSinceCrash,
+
+                alpha:
+                    alpha,
+
+                intervals:
+                    intervals
+            )
+
+        runYear(
+            year:
+                currentYear,
+
+            equilibriumPressure:
+                equilibrium,
+
+            volumePressure:
+                volumePressure,
+
+            scenario:
+                scenario
+        )
+
+        return MarketRiskResult(
+
+            year:
+                currentYear,
+
+            equilibriumPressure:
+                equilibrium,
+
+            volumePressure:
+                bounded(
+                    volumePressure
+                ),
+
+            averageEnergy:
+                averageEnergy(),
+
+            averageMomentum:
+                averageMomentum(),
+
+            averageFinancialPotential:
+                averageFinancialPotential(),
+
+            averageLiquidity:
+                averageLiquidity(),
+
+            averageCapital:
+                averageCapital(),
+
+            exhaustion:
+                averageExhaustion(),
+
+            cellularStress:
+                cellularStress(),
+
+            criticalCellFraction:
+                criticalCellFraction(),
+
+            crashCellFraction:
+                crashCellFraction(),
+
+            systemicRisk:
+                systemicRisk(),
+
+            riskLevel:
+                riskLevel()
+        )
+    }
+
+    // ========================================================
     // MARK: - Validation
+    // ========================================================
 
     func validateCellState() -> Bool {
 
@@ -2243,13 +2871,13 @@ final class MarketExhaustionEngine: ObservableObject {
 
             guard cell.momentum.isFinite,
                   cell.momentum >= -1.0,
-                  cell.momentum <= 1.0 else {
+                  cell.momentum <= 1.0
+            else {
                 return false
             }
 
-            // Momentum is signed ([-1, 1]); every other field is
-            // unsigned and bounded to [0, 1].
             let unsignedValues = [
+
                 cell.energy,
                 cell.liquidity,
                 cell.capital,
@@ -2262,12 +2890,25 @@ final class MarketExhaustionEngine: ObservableObject {
 
             for value in unsignedValues {
 
-                guard value.isFinite else {
+                guard value.isFinite,
+                      value >= 0.0,
+                      value <= 1.0
+                else {
                     return false
                 }
+            }
 
-                guard value >= 0.0,
-                      value <= 1.0 else {
+            // State must agree with the stress thresholds unless
+            // the cell is crashed because of severe energy
+            // depletion.
+            if cell.state != .crashed {
+
+                let expected =
+                    stateForStress(
+                        cell.stress
+                    )
+
+                guard cell.state == expected else {
                     return false
                 }
             }
@@ -2276,36 +2917,99 @@ final class MarketExhaustionEngine: ObservableObject {
         return true
     }
 
+    // ========================================================
+    // MARK: - Historical Causality Validation
+    // ========================================================
+
     func validateHistoricalCausality(
         year: Int
     ) -> Bool {
 
-        guard let index =
+        guard let selectedIndex =
                 historicalCrashIndex(
-                    for: year
-                ) else {
+                    for:
+                        year
+                )
+        else {
 
+            // No crash before this year.
             return crashRecords.allSatisfy {
                 $0.year > year
             }
         }
 
-        return crashRecords[
-            index
-        ].year <= year
-        &&
-        crashRecords[
-            index
-        ].year <= year
-        &&
-        crashRecords[
-            index
-        ].year ==
-            crashRecords.last(
+        guard selectedIndex >= 0,
+              selectedIndex < crashRecords.count
+        else {
+            return false
+        }
+
+        // The selected record must be the latest crash that
+        // actually occurred by this year.
+        let expectedIndex =
+            crashRecords.indices.last(
+                where: {
+                    crashRecords[$0].year <= year
+                }
+            )
+
+        return selectedIndex ==
+            expectedIndex
+    }
+
+    // ========================================================
+    // MARK: - Historical Scenario Validation
+    // ========================================================
+
+    /// Confirms that the scenario selected for a year does not
+    /// come from a future historical observation.
+    func validateHistoricalScenarioCausality(
+        year: Int
+    ) -> Bool {
+
+        guard let selected =
+            historicalYears.last(
                 where: {
                     $0.year <= year
                 }
-            )?.year
+            )
+        else {
+            return historicalYears.allSatisfy {
+                $0.year > year
+            }
+        }
+
+        return selected.year <= year
+    }
+
+    // ========================================================
+    // MARK: - Full Model Validation
+    // ========================================================
+
+    func validateModel() -> Bool {
+
+        guard gridWidth > 0,
+              gridHeight > 0
+        else {
+            return false
+        }
+
+        guard !cells.isEmpty else {
+            return false
+        }
+
+        guard validateCellState() else {
+            return false
+        }
+
+        guard validateHistoricalCausality(
+            year:
+                crashRecords.last?.year ?? 0
+        )
+        else {
+            return false
+        }
+
+        return true
     }
 }
-
