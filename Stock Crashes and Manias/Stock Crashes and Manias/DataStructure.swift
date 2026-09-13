@@ -7,7 +7,331 @@
 
 import Foundation
 import SwiftUI
+import Combine
 
+struct CAParameters: Codable, Equatable {
+
+    // MARK: Grid
+
+    var generationsPerYear: Int = 8
+
+    // MARK: State thresholds
+
+    var risingThreshold: Double = 0.20
+    var stressedThreshold: Double = 0.40
+    var criticalThreshold: Double = 0.65
+    var crashThreshold: Double = 0.85
+
+    // MARK: Cellular weights
+
+    var equilibriumWeight: Double = 0.40
+    var volumeWeight: Double = 0.30
+    var contagionWeight: Double = 0.20
+
+    // MARK: Systemic-risk weights
+
+    var systemicEquilibriumWeight: Double = 0.20
+    var systemicVolumeWeight: Double = 0.15
+    var systemicStressWeight: Double = 0.30
+    var systemicCriticalWeight: Double = 0.20
+    var systemicCrashWeight: Double = 0.15
+
+    // MARK: Spatial behavior
+
+    var spatialSignalAmplitude: Double = 0.05
+    var spatialInitializationVariation: Double = 0.03
+
+    // MARK: Stochastic behavior
+
+    var stochasticNoiseAmplitude: Double = 0.012
+    var randomSeed: UInt64 = 42
+
+    // MARK: Normalization
+
+    func normalized() -> CAParameters {
+        var copy = self
+
+        copy.generationsPerYear = max(
+            copy.generationsPerYear,
+            1
+        )
+
+        copy.risingThreshold = clamp(copy.risingThreshold)
+        copy.stressedThreshold = clamp(copy.stressedThreshold)
+        copy.criticalThreshold = clamp(copy.criticalThreshold)
+        copy.crashThreshold = clamp(copy.crashThreshold)
+
+        copy.equilibriumWeight = clamp(copy.equilibriumWeight)
+        copy.volumeWeight = clamp(copy.volumeWeight)
+        copy.contagionWeight = clamp(copy.contagionWeight)
+
+        copy.systemicEquilibriumWeight =
+            clamp(copy.systemicEquilibriumWeight)
+
+        copy.systemicVolumeWeight =
+            clamp(copy.systemicVolumeWeight)
+
+        copy.systemicStressWeight =
+            clamp(copy.systemicStressWeight)
+
+        copy.systemicCriticalWeight =
+            clamp(copy.systemicCriticalWeight)
+
+        copy.systemicCrashWeight =
+            clamp(copy.systemicCrashWeight)
+
+        copy.spatialSignalAmplitude =
+            max(copy.spatialSignalAmplitude, 0.0)
+
+        copy.spatialInitializationVariation =
+            max(copy.spatialInitializationVariation, 0.0)
+
+        copy.stochasticNoiseAmplitude =
+            max(copy.stochasticNoiseAmplitude, 0.0)
+
+        return copy
+    }
+
+    private func clamp(
+        _ value: Double
+    ) -> Double {
+        guard value.isFinite else {
+            return 0.0
+        }
+
+        return min(
+            max(value, 0.0),
+            1.0
+        )
+    }
+}
+
+struct CARandomGenerator {
+
+    private var state: UInt64
+
+    init(seed: UInt64) {
+        self.state = seed == 0
+            ? 0x9E3779B97F4A7C15
+            : seed
+    }
+
+    mutating private func nextUInt64() -> UInt64 {
+
+        state &+= 0x9E3779B97F4A7C15
+
+        var z = state
+
+        z = (z ^ (z >> 30)) &*
+            0xBF58476D1CE4E5B9
+
+        z = (z ^ (z >> 27)) &*
+            0x94D049BB133111EB
+
+        return z ^ (z >> 31)
+    }
+
+    mutating func nextUnit() -> Double {
+
+        let value = nextUInt64()
+
+        return Double(
+            value >> 11
+        ) / Double(
+            1 << 53
+        )
+    }
+
+    mutating func centeredUnit() -> Double {
+
+        return nextUnit() * 2.0 - 1.0
+    }
+}
+
+struct MarketVolumePoint: Identifiable, Equatable {
+
+    let id: UUID
+    let date: Date
+    let volumeMillions: Double
+
+    init(
+        id: UUID = UUID(),
+        date: Date,
+        volumeMillions: Double
+    ) {
+        self.id = id
+        self.date = date
+        self.volumeMillions = volumeMillions
+    }
+}
+
+struct MarketRiskResult: Identifiable {
+
+    let id: UUID
+
+    let currentYear: Int
+    let yearsSinceCrash: Int
+
+    let alpha: Double
+
+    let equilibriumPressure: Double
+    let volumePressure: Double
+
+    let cellularStress: Double
+    let criticalFraction: Double
+    let crashFraction: Double
+
+    let systemicRisk: Double
+
+    let predictedWindowStart: Int
+    let predictedWindowEnd: Int
+
+    let riskLevel: String
+
+    let yearlyRiskHistory: [YearlyRiskSnapshot]
+
+    init(
+        id: UUID = UUID(),
+        currentYear: Int,
+        yearsSinceCrash: Int,
+        alpha: Double,
+        equilibriumPressure: Double,
+        volumePressure: Double,
+        cellularStress: Double,
+        criticalFraction: Double,
+        crashFraction: Double,
+        systemicRisk: Double,
+        predictedWindowStart: Int,
+        predictedWindowEnd: Int,
+        riskLevel: String,
+        yearlyRiskHistory: [YearlyRiskSnapshot]
+    ) {
+        self.id = id
+        self.currentYear = currentYear
+        self.yearsSinceCrash = yearsSinceCrash
+        self.alpha = alpha
+        self.equilibriumPressure = equilibriumPressure
+        self.volumePressure = volumePressure
+        self.cellularStress = cellularStress
+        self.criticalFraction = criticalFraction
+        self.crashFraction = crashFraction
+        self.systemicRisk = systemicRisk
+        self.predictedWindowStart = predictedWindowStart
+        self.predictedWindowEnd = predictedWindowEnd
+        self.riskLevel = riskLevel
+        self.yearlyRiskHistory = yearlyRiskHistory
+    }
+}
+
+struct HistoricalCrashAnalysis: Identifiable{
+
+    let id: UUID
+
+    let year: Int
+    let intervalYears: Int
+
+    let result: MarketRiskResult
+
+    let cells: [MarketCell]
+
+    init(
+        id: UUID = UUID(),
+        year: Int,
+        intervalYears: Int,
+        result: MarketRiskResult,
+        cells: [MarketCell]
+    ) {
+        self.id = id
+        self.year = year
+        self.intervalYears = intervalYears
+        self.result = result
+        self.cells = cells
+    }
+}
+struct YearlyRiskSnapshot: Identifiable {
+    
+    let id: UUID
+    let year: Int
+    let generationCount: Int
+    
+    let equilibriumPressure: Double
+    let volumePressure: Double
+    
+    let cellularStress: Double
+    let criticalFraction: Double
+    let crashFraction: Double
+    
+    let systemicRisk: Double
+    let riskLevel: String
+    
+    let cells: [MarketCell]
+    
+    init(
+        id: UUID = UUID(),
+        year: Int,
+        generationCount: Int,
+        equilibriumPressure: Double,
+        volumePressure: Double,
+        cellularStress: Double,
+        criticalFraction: Double,
+        crashFraction: Double,
+        systemicRisk: Double,
+        riskLevel: String,
+        cells: [MarketCell]
+    ) {
+        self.id = id
+        self.year = year
+        self.generationCount = generationCount
+        self.equilibriumPressure = equilibriumPressure
+        self.volumePressure = volumePressure
+        self.cellularStress = cellularStress
+        self.criticalFraction = criticalFraction
+        self.crashFraction = crashFraction
+        self.systemicRisk = systemicRisk
+        self.riskLevel = riskLevel
+        self.cells = cells
+    }
+}
+
+enum MarketCellState: String {
+    
+    case stable
+    case rising
+    case stressed
+    case critical
+    case crash
+    
+    var name: String {
+        switch self {
+        case .stable:
+            return "Stable"
+        case .rising:
+            return "Rising"
+        case .stressed:
+            return "Stressed"
+        case .critical:
+            return "Critical"
+        case .crash:
+            return "Release"
+        }
+    }
+}
+
+struct CrashRecord: Identifiable, Equatable, Codable {
+    let id: UUID
+    let year: Int
+    let volumeMillions: Double
+
+    init(
+        id: UUID = UUID(),
+        year: Int,
+        volumeMillions: Double
+    ) {
+        self.id = id
+        self.year = year
+        self.volumeMillions = volumeMillions
+    }
+}
 
 struct MarketCell: Identifiable {
 
@@ -50,12 +374,11 @@ struct MarketCell: Identifiable {
 // ============================================================
 
 enum MarketState: String {
-
     case stable
     case rising
     case stressed
     case critical
-    case released
+    case crashed
 }
 
 // ============================================================
@@ -889,26 +1212,4 @@ struct HistoricalAnalysis: Identifiable {
 // MARK: - MARKET CELL
 // ============================================================
 
-enum MarketCellState: String {
 
-    case stable
-    case rising
-    case stressed
-    case critical
-    case crash
-
-    var name: String {
-        switch self {
-        case .stable:
-            return "Stable"
-        case .rising:
-            return "Rising"
-        case .stressed:
-            return "Stressed"
-        case .critical:
-            return "Critical"
-        case .crash:
-            return "Release"
-        }
-    }
-}

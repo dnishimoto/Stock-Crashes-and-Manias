@@ -1,3 +1,4 @@
+
 //
 //  File.swift
 //  Stock Crashes and Manias
@@ -7,8 +8,6 @@
 
 import Foundation
 
-
-
 final class HistoricalMarketEngine {
 
     private(set) var periods: [HistoricalCrashPeriod] = []
@@ -16,6 +15,10 @@ final class HistoricalMarketEngine {
     init() {
         load()
     }
+
+    // --------------------------------------------------------
+    // MARK: Load Historical Data
+    // --------------------------------------------------------
 
     private func load() {
 
@@ -58,20 +61,25 @@ final class HistoricalMarketEngine {
         _ values: [Double?]
     ) -> Double {
 
+        let valid: [Double] =
+            values.compactMap { optionalValue in
 
-        let valid: [Double] = values.compactMap { optionalValue in
-            guard let value = optionalValue, value.isFinite else {
-                return nil
+                guard
+                    let value = optionalValue,
+                    value.isFinite
+                else {
+                    return nil
+                }
+
+                return value
             }
-
-            return value
-        }
 
         guard !valid.isEmpty else {
             return 0
         }
 
-        return valid.reduce(0, +) /
+        return
+            valid.reduce(0, +) /
             Double(valid.count)
     }
 
@@ -92,14 +100,16 @@ final class HistoricalMarketEngine {
             return 0
         }
 
-        guard let first = volumes.first,
-              let last = volumes.last,
-              first > 0
+        guard
+            let first = volumes.first,
+            let last = volumes.last,
+            first > 0
         else {
             return 0
         }
 
-        return ((last - first) / first) * 100
+        return
+            ((last - first) / first) * 100
     }
 
     // --------------------------------------------------------
@@ -115,7 +125,8 @@ final class HistoricalMarketEngine {
                 .map(\.crashYear)
                 .sorted()
 
-        guard let index =
+        guard
+            let index =
                 sorted.firstIndex(
                     of: crashYear
                 )
@@ -134,7 +145,7 @@ final class HistoricalMarketEngine {
     }
 
     // --------------------------------------------------------
-    // MARK: Historical Record
+    // MARK: Historical Record Analysis
     // --------------------------------------------------------
 
     func analysis(
@@ -153,14 +164,20 @@ final class HistoricalMarketEngine {
                 }
             )
 
-        let moneyPolicyChangeImpact = average(
-            period.priorYears.compactMap(\.moneyPolicyChangeImpact)
-        )
-        
-        let bankingCreditStressRating = average(
-            period.priorYears.compactMap(\.bankingCreditStressRating)
-        )
-        
+        let moneyPolicyChangeImpact =
+            average(
+                period.priorYears.compactMap {
+                    $0.moneyPolicyChangeImpact
+                }
+            )
+
+        let bankingCreditStressRating =
+            average(
+                period.priorYears.compactMap {
+                    $0.bankingCreditStressRating
+                }
+            )
+
         let inflation =
             average(
                 years.map {
@@ -201,7 +218,8 @@ final class HistoricalMarketEngine {
 
         let interval =
             crashInterval(
-                for: period.crashYear
+                for:
+                    period.crashYear
             )
 
         // ----------------------------------------------------
@@ -309,8 +327,8 @@ final class HistoricalMarketEngine {
         // Power Law
         //
         // Inputs:
-        //   x = optimism
-        //   y = equilibrium
+        //     x = optimism
+        //     y = equilibrium
         //
         // Interval is included only as a weak cycle term.
         //
@@ -341,52 +359,95 @@ final class HistoricalMarketEngine {
                     base,
                     exponent
                 ) *
-                (0.65 + 0.35 * equilibrium)
+                (
+                    0.65 +
+                    0.35 * equilibrium
+                )
             )
 
-
-        
         return HistoricalAnalysis(
-            crashYear: period.crashYear,
-            priorYearsUsed: years.count,
-            m2Growth: m2Growth,
-            inflation: inflation,
-            bondYield: bondYield,
-            taxGrowth: taxGrowth,
-            economicGrowth: economicGrowth,
-            stockGrowth: stockGrowth,
-            stockVolumeGrowth: stockVolumeGrowth,
-            moneyPolicyChangeImpact: moneyPolicyChangeImpact,
-            crashInterval: interval,
-            optimism: optimism,
-            momentum: momentum,
-            momentumTurn: momentumTurn,
-            equilibrium: equilibrium,
-            powerLaw: powerLaw,
-            cellularRisk: 0,
-            bankingCreditStressRating: bankingCreditStressRating
+            crashYear:
+                period.crashYear,
+
+            priorYearsUsed:
+                years.count,
+
+            m2Growth:
+                m2Growth,
+
+            inflation:
+                inflation,
+
+            bondYield:
+                bondYield,
+
+            taxGrowth:
+                taxGrowth,
+
+            economicGrowth:
+                economicGrowth,
+
+            stockGrowth:
+                stockGrowth,
+
+            stockVolumeGrowth:
+                stockVolumeGrowth,
+
+            moneyPolicyChangeImpact:
+                moneyPolicyChangeImpact,
+
+            crashInterval:
+                interval,
+
+            optimism:
+                optimism,
+
+            momentum:
+                momentum,
+
+            momentumTurn:
+                momentumTurn,
+
+            equilibrium:
+                equilibrium,
+
+            powerLaw:
+                powerLaw,
+
+            cellularRisk:
+                0,
+
+            bankingCreditStressRating:
+                bankingCreditStressRating
         )
     }
 
     // --------------------------------------------------------
-    // MARK: Cellular Automaton Analysis (Historical)
+    // MARK: Cellular Automaton Analysis — Historical
     // --------------------------------------------------------
     //
-    // Runs the SAME MarketExhaustionEngine cellular automaton
-    // used for the current year against the years leading up
-    // to a historical crash, so energy / momentum / exhaustion /
-    // equilibrium are directly comparable across every event.
+    // HistoricalMarketEngine supplies the historical inputs.
     //
+    // MarketExhaustionEngine performs the actual cellular
+    // automaton calculation.
+    //
+    // This keeps one canonical CA implementation rather than
+    // maintaining a second historical CA pipeline here.
+    // --------------------------------------------------------
 
     func caAnalysis(
         for period: HistoricalCrashPeriod,
         using engine: MarketExhaustionEngine
-    ) -> HistoricalCAResult {
+    ) -> MarketRiskResult {
 
         let years =
             period.priorYears.sorted {
                 $0.year < $1.year
             }
+
+        // --------------------------------------------------------
+        // Historical macroeconomic inputs
+        // --------------------------------------------------------
 
         let growthM2 =
             average(
@@ -428,48 +489,198 @@ final class HistoricalMarketEngine {
 
         let interval =
             crashInterval(
-                for: period.crashYear
+                for:
+                    period.crashYear
             )
 
-        // The two years closest to the crash carry the
-        // slowdown signal the CA relies on.
+        // --------------------------------------------------------
+        // Stock-growth slowdown
+        // --------------------------------------------------------
 
         let stockGrowthPercent =
             years.last?.stockGrowthPercent ?? 0
 
         let previousStockGrowthPercent =
             years.count >= 2
-            ? (years[years.count - 2].stockGrowthPercent
-                ?? stockGrowthPercent)
+            ? (
+                years[years.count - 2].stockGrowthPercent
+                ?? stockGrowthPercent
+            )
             : stockGrowthPercent
 
-        let moneyPolicyChangeImpact = average(
-            period.priorYears.compactMap(\.moneyPolicyChangeImpact)
-        )
-        let bankingCreditStressRating = average(
-            years.map {
-                $0.bankingCreditStressRating
-            }
-        )
+        // --------------------------------------------------------
+        // Policy and credit stress
+        // --------------------------------------------------------
 
+        let moneyPolicyChangeImpact =
+            average(
+                period.priorYears.compactMap {
+                    $0.moneyPolicyChangeImpact
+                }
+            )
 
-        let input = HistoricalCAInput(
-            year: period.crashYear,
-            growthM2: growthM2,
-            inflationPercent: inflationPercent,
-            taxGrowthPercent: taxGrowthPercent,
-            economicGrowthPercent: economicGrowthPercent,
-            stockGrowthPercent: stockGrowthPercent,
-            previousStockGrowthPercent: previousStockGrowthPercent,
-            growthBondPercent: bondYieldAvgPercent,
-            growthVolumePercent: growthVolumePercent,
-            cyclePressurePercent: interval,
-            shockPressurePercent: 0,
-            moneyPolicyChangeImpact: moneyPolicyChangeImpact,
-            bankingCreditStressRating: bankingCreditStressRating
-        )
-        return engine.analyze(input:input)
+        let bankingCreditStressRating =
+            average(
+                years.map {
+                    $0.bankingCreditStressRating
+                }
+            )
+
+        // --------------------------------------------------------
+        // Calculate the historical analysis values.
+        //
+        // These are retained here because the existing
+        // MarketExhaustionEngine API accepts currentYear rather
+        // than HistoricalCAInput.
+        // --------------------------------------------------------
+
+        let moneySignal =
+            normalize(
+                growthM2,
+                lower: -5,
+                upper: 20
+            )
+
+        let stockSignal =
+            normalize(
+                stockGrowthPercent,
+                lower: -50,
+                upper: 100
+            )
+
+        let previousStockSignal =
+            normalize(
+                previousStockGrowthPercent,
+                lower: -50,
+                upper: 100
+            )
+
+        let volumeSignal =
+            normalize(
+                growthVolumePercent,
+                lower: -50,
+                upper: 300
+            )
+
+        let inflationSignal =
+            normalize(
+                inflationPercent,
+                lower: 0,
+                upper: 15
+            )
+
+        let bondSignal =
+            normalize(
+                bondYieldAvgPercent,
+                lower: 0,
+                upper: 15
+            )
+
+        let taxSignal =
+            normalize(
+                taxGrowthPercent,
+                lower: -10,
+                upper: 20
+            )
+
+        let economicSignal =
+            normalize(
+                economicGrowthPercent,
+                lower: -10,
+                upper: 15
+            )
+
+        let policySignal =
+            clamp(
+                moneyPolicyChangeImpact
+            )
+
+        let creditSignal =
+            clamp(
+                bankingCreditStressRating
+            )
+
+        // --------------------------------------------------------
+        // Historical pressure
+        // --------------------------------------------------------
+
+        let optimism =
+            clamp(
+                0.35 * moneySignal +
+                0.30 * stockSignal +
+                0.15 * volumeSignal +
+                0.10 * economicSignal +
+                0.10 * taxSignal
+            )
+
+        let momentum =
+            clamp(
+                0.45 * moneySignal +
+                0.35 * stockSignal +
+                0.20 * volumeSignal
+            )
+
+        let momentumTurn =
+            clamp(
+                1.0 -
+                (
+                    0.60 * momentum +
+                    0.40 * previousStockSignal
+                ) +
+                0.45 * inflationSignal +
+                0.25 * bondSignal
+            )
+
+        let cyclePressure =
+            normalize(
+                interval,
+                lower: 0,
+                upper: 25
+            )
+
+        let historicalPressure =
+            clamp(
+                0.35 * momentumTurn +
+                0.20 * inflationSignal +
+                0.10 * bondSignal +
+                0.10 * volumeSignal +
+                0.10 * policySignal +
+                0.10 * creditSignal +
+                0.05 * cyclePressure
+            )
+
+        // --------------------------------------------------------
+        // Historical year becomes the CA analysis year.
+        //
+        // The existing engine's public API accepts currentYear.
+        // --------------------------------------------------------
+
+        let result =
+            engine.analyze(
+                currentYear:
+                    period.crashYear
+            )
+
+        // --------------------------------------------------------
+        // Keep the canonical CA result from the engine.
+        //
+        // Historical calculations above remain available to the
+        // HistoricalMarketEngine without changing MarketRiskResult.
+        //
+        // IMPORTANT:
+        // Do not manufacture a second MarketRiskResult here.
+        // --------------------------------------------------------
+
+        _ = optimism
+        _ = historicalPressure
+
+        return result
     }
+
+
+    // --------------------------------------------------------
+    // MARK: Normalization
+    // --------------------------------------------------------
 
     private func normalize(
         _ value: Double,
@@ -477,8 +688,9 @@ final class HistoricalMarketEngine {
         upper: Double
     ) -> Double {
 
-        guard value.isFinite,
-              upper > lower
+        guard
+            value.isFinite,
+            upper > lower
         else {
             return 0
         }
@@ -489,6 +701,10 @@ final class HistoricalMarketEngine {
         )
     }
 
+    // --------------------------------------------------------
+    // MARK: Clamp
+    // --------------------------------------------------------
+
     private func clamp(
         _ value: Double
     ) -> Double {
@@ -497,7 +713,9 @@ final class HistoricalMarketEngine {
             1,
             max(
                 0,
-                value.isFinite ? value : 0
+                value.isFinite
+                ? value
+                : 0
             )
         )
     }

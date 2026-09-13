@@ -1,3 +1,4 @@
+
 //
 //  ContentView.swift
 //  Stock Crashes and Manias
@@ -10,7 +11,7 @@ import SwiftUI
 import Foundation
 
 // ============================================================
-// MARK: Content View
+// MARK: - Content View
 // ============================================================
 
 struct ContentView: View {
@@ -24,22 +25,28 @@ struct ContentView: View {
     @State private var growthM2 = 5.0
     @State private var moneyPolicyChangeImpact = 0.62
     @State private var bankingCreditStressRating = 2.0
+
     @State private var inflationPercent = 3.0
     @State private var taxGrowthPercent = 5.0
     @State private var economicGrowthPercent = 3.0
+
     @State private var stockGrowthPercent = 12.0
     @State private var previousStockGrowthPercent = 20.0
+
     @State private var bondYieldAvgPercent = 4.5
     @State private var growthVolumePercent = 10.0
+
     @State private var crashInterval = 6.0
     @State private var externalShockPercent = 0.0
 
+    // The UI is intentionally based on HistoricalCAResult.
     @State private var result =
         ContentView.defaultResult()
 
     @State private var historicalAnalyses:
         [HistoricalAnalysis] = []
 
+    // One canonical CA engine.
     private let engine =
         MarketExhaustionEngine()
 
@@ -48,47 +55,31 @@ struct ContentView: View {
 
     // ========================================================
     // MARK: All Crash Results
-    //
-    // Every historical crash year is evaluated using the
-    // current fixed scenario parameters.
-    //
-    // Each result also captures the complete cellular-automaton
-    // history leading into that crash year.
     // ========================================================
 
-    private var allCrashResults:
-        [(
+    private var allCrashResults: [
+        (
             period: HistoricalCrashPeriod,
             result: HistoricalCAResult,
-            cells: [MarketCell],
-            historicalFrames: [HistoricalCAFrame]
-        )] {
+            cells: [MarketCell]
+        )
+    ] {
 
-        historicalEngine.periods
-            .sorted { $0.crashYear < $1.crashYear }
-            .map { period in
+        historicalEngine.periods.compactMap { period in
 
-                let result = historicalEngine.caAnalysis(
-                    for: period,
-                    using: engine
-                )
+            let result = historicalEngine.caAnalysis(
+                for: period,
+                using: engine
+            )
 
-                // caAnalysis() leaves the engine containing the
-                // historical CA sequence. Capture it before the
-                // engine is reused for the next crash period.
-                let frames = engine.historicalFrames
+            let cells = engine.cells
 
-                // The CA result does not contain cells.
-                // The engine owns the final CA cells.
-                let cells = engine.cells
-
-                return (
-                    period: period,
-                    result: result,
-                    cells: cells,
-                    historicalFrames: frames
-                )
-            }
+            return (
+                period: period,
+                result: result,
+                cells: cells
+            )
+        }
     }
 
     // ========================================================
@@ -110,15 +101,7 @@ struct ContentView: View {
 
                     scenarioCard
 
-                    // ------------------------------------------------
-                    // Current scenario
-                    // ------------------------------------------------
-
                     currentScenarioSection
-
-                    // ------------------------------------------------
-                    // Historical crash-year panels
-                    // ------------------------------------------------
 
                     VStack(
                         alignment: .leading,
@@ -147,25 +130,23 @@ struct ContentView: View {
                         ) { entry in
 
                             historicalCrashPanel(
-                                analysis: historicalEngine.analysis(
-                                    for: entry.period
-                                ),
-                                result: entry.result,
-                                cells: entry.cells,
-                                historicalFrames: entry.historicalFrames
+                                analysis:
+                                    historicalEngine.analysis(
+                                        for: entry.period
+                                    ),
+                                result:
+                                    entry.result,
+                                cells:
+                                    entry.cells,
+                                historicalFrames:
+                                    entry.historicalFrames
                             )
                         }
                     }
 
-                    // ------------------------------------------------
-                    // Historical matrix
-                    // ------------------------------------------------
-
                     historicalMatrixCard
 
                     modelSummaryCard
-
-                    //.disclaimerCard
                 }
                 .padding()
             }
@@ -185,7 +166,8 @@ struct ContentView: View {
                     } label: {
 
                         Image(
-                            systemName: "arrow.clockwise"
+                            systemName:
+                                "arrow.clockwise"
                         )
                     }
                 }
@@ -209,8 +191,10 @@ struct ContentView: View {
             spacing: 12
         ) {
 
-            Text("Current Scenario Result")
-                .font(.title3.bold())
+            Text(
+                "Current Scenario Result"
+            )
+            .font(.title3.bold())
 
             equilibriumCard
             energyCard
@@ -231,6 +215,7 @@ struct ContentView: View {
         cells: [MarketCell],
         historicalFrames: [HistoricalCAFrame]
     ) -> some View {
+
         VStack(
             alignment: .leading,
             spacing: 12
@@ -306,10 +291,6 @@ struct ContentView: View {
     // MARK: Historical Power Law
     // ========================================================
 
-    // ========================================================
-    // MARK: Historical Financial Gravity
-    // ========================================================
-
     private func historicalPowerLawCard(
         analysis: HistoricalAnalysis,
         result: HistoricalCAResult
@@ -320,30 +301,35 @@ struct ContentView: View {
             spacing: 10
         ) {
 
-            Text("Financial Gravity & Equilibrium")
-                .font(.headline)
+            Text(
+                "Financial Gravity & Equilibrium"
+            )
+            .font(.headline)
 
             HStack {
 
                 metric(
                     title: "Equilibrium",
-                    value: percent(
-                        result.equilibriumPressure
-                    )
+                    value:
+                        percent(
+                            result.equilibriumPressure
+                        )
                 )
 
                 metric(
                     title: "Inflection",
-                    value: percent(
-                        result.equilibriumInflection
-                    )
+                    value:
+                        percent(
+                            result.equilibriumInflection
+                        )
                 )
 
                 metric(
                     title: "Power Law",
-                    value: percent(
-                        analysis.powerLaw
-                    )
+                    value:
+                        percent(
+                            analysis.powerLaw
+                        )
                 )
             }
 
@@ -353,23 +339,28 @@ struct ContentView: View {
 
                 metric(
                     title: "Potential",
-                    value: percent(
-                        result.financialPotential
-                    )
+                    value:
+                        percent(
+                            result.financialPotential
+                        )
                 )
 
                 metric(
                     title: "Gradient",
-                    value: percent(
-                        abs(result.potentialGradient)
-                    )
+                    value:
+                        percent(
+                            abs(
+                                result.potentialGradient
+                            )
+                        )
                 )
 
                 metric(
                     title: "Contagion",
-                    value: percent(
-                        result.contagion
-                    )
+                    value:
+                        percent(
+                            result.contagion
+                        )
                 )
             }
 
@@ -377,23 +368,28 @@ struct ContentView: View {
 
                 metric(
                     title: "Policy Force",
-                    value: percent(
-                        abs(result.financialPathForce)
-                    )
+                    value:
+                        percent(
+                            abs(
+                                result.financialPathForce
+                            )
+                        )
                 )
 
                 metric(
                     title: "Banking Mass",
-                    value: percent(
-                        result.effectiveFinancialMass
-                    )
+                    value:
+                        percent(
+                            result.effectiveFinancialMass
+                        )
                 )
 
                 metric(
                     title: "Interaction",
-                    value: percent(
-                        result.bankingPolicyInteraction
-                    )
+                    value:
+                        percent(
+                            result.bankingPolicyInteraction
+                        )
                 )
             }
 
@@ -429,10 +425,6 @@ struct ContentView: View {
     // MARK: Historical Energy
     // ========================================================
 
-    // ========================================================
-    // MARK: Historical Energy & Momentum
-    // ========================================================
-
     private func historicalEnergyCard(
         result: HistoricalCAResult
     ) -> some View {
@@ -442,30 +434,35 @@ struct ContentView: View {
             spacing: 10
         ) {
 
-            Text("Financial Energy & Path")
-                .font(.headline)
+            Text(
+                "Financial Energy & Path"
+            )
+            .font(.headline)
 
             HStack {
 
                 metric(
                     title: "Energy",
-                    value: percent(
-                        result.finalEnergy
-                    )
+                    value:
+                        percent(
+                            result.finalEnergy
+                        )
                 )
 
                 metric(
                     title: "Momentum",
-                    value: percent(
-                        result.finalMomentum
-                    )
+                    value:
+                        percent(
+                            result.finalMomentum
+                        )
                 )
 
                 metric(
                     title: "Useful Fuel",
-                    value: percent(
-                        result.usefulFuel
-                    )
+                    value:
+                        percent(
+                            result.usefulFuel
+                        )
                 )
             }
 
@@ -475,23 +472,28 @@ struct ContentView: View {
 
                 metric(
                     title: "Path Force",
-                    value: percent(
-                        abs(result.financialPathForce)
-                    )
+                    value:
+                        percent(
+                            abs(
+                                result.financialPathForce
+                            )
+                        )
                 )
 
                 metric(
                     title: "Energy Depletion",
-                    value: percent(
-                        result.energyDepletion
-                    )
+                    value:
+                        percent(
+                            result.energyDepletion
+                        )
                 )
 
                 metric(
                     title: "Potential",
-                    value: percent(
-                        result.financialPotential
-                    )
+                    value:
+                        percent(
+                            result.financialPotential
+                        )
                 )
             }
 
@@ -518,10 +520,6 @@ struct ContentView: View {
     // MARK: Historical Exhaustion
     // ========================================================
 
-    // ========================================================
-    // MARK: Historical Exhaustion
-    // ========================================================
-
     private func historicalExhaustionCard(
         result: HistoricalCAResult
     ) -> some View {
@@ -531,69 +529,81 @@ struct ContentView: View {
             spacing: 10
         ) {
 
-            Text("Exhaustion & Resistance")
-                .font(.headline)
+            Text(
+                "Exhaustion & Resistance"
+            )
+            .font(.headline)
 
             HStack {
 
                 metric(
                     title: "Mean",
-                    value: percent(
-                        result.meanExhaustion
-                    )
+                    value:
+                        percent(
+                            result.meanExhaustion
+                        )
                 )
 
                 metric(
                     title: "Local",
-                    value: percent(
-                        result.localExhaustion
-                    )
+                    value:
+                        percent(
+                            result.localExhaustion
+                        )
                 )
 
                 metric(
                     title: "Total",
-                    value: percent(
-                        result.totalExhaustion
-                    )
+                    value:
+                        percent(
+                            result.totalExhaustion
+                        )
                 )
             }
 
             ProgressView(
-                value: max(
-                    0,
-                    min(
-                        1,
-                        result.totalExhaustion
+                value:
+                    max(
+                        0,
+                        min(
+                            1,
+                            result.totalExhaustion
+                        )
                     )
-                )
             )
 
             HStack {
 
                 metric(
                     title: "Banking Stress",
-                    value: percent(
-                        result.bankingStress
-                    )
+                    value:
+                        percent(
+                            result.bankingStress
+                        )
                 )
 
                 metric(
                     title: "Financial Mass",
-                    value: percent(
-                        result.effectiveFinancialMass
-                    )
+                    value:
+                        percent(
+                            result.effectiveFinancialMass
+                        )
                 )
 
                 metric(
                     title: "Attractor",
-                    value: percent(
-                        result.nonlinearFinancialAttractor
-                    )
+                    value:
+                        percent(
+                            result.nonlinearFinancialAttractor
+                        )
                 )
             }
 
             HStack {
-                Text("Exhaustion state")
+
+                Text(
+                    "Exhaustion state"
+                )
 
                 Spacer()
 
@@ -637,8 +647,10 @@ struct ContentView: View {
             spacing: 10
         ) {
 
-            Text("Cellular Automaton")
-                .font(.headline)
+            Text(
+                "Cellular Automaton"
+            )
+            .font(.headline)
 
             Text(
                 "Each cell represents a local market state carrying "
@@ -650,14 +662,15 @@ struct ContentView: View {
             .foregroundStyle(.secondary)
 
             LazyVGrid(
-                columns: Array(
-                    repeating:
-                        GridItem(
-                            .flexible(),
-                            spacing: 2
-                        ),
-                    count: 20
-                ),
+                columns:
+                    Array(
+                        repeating:
+                            GridItem(
+                                .flexible(),
+                                spacing: 2
+                            ),
+                        count: 20
+                    ),
                 spacing: 2
             ) {
 
@@ -703,7 +716,7 @@ struct ContentView: View {
                 )
 
                 stateLegend(
-                    "Release",
+                    "Crashed",
                     .purple
                 )
             }
@@ -722,10 +735,6 @@ struct ContentView: View {
     // MARK: Historical Risk
     // ========================================================
 
-    // ========================================================
-    // MARK: Historical Systemic Risk
-    // ========================================================
-
     private func historicalRiskCard(
         result: HistoricalCAResult
     ) -> some View {
@@ -735,13 +744,15 @@ struct ContentView: View {
             spacing: 10
         ) {
 
-            Text("Emergent Systemic Risk")
-                .font(.headline)
+            Text(
+                "Emergent Systemic Risk"
+            )
+            .font(.headline)
 
             HStack {
 
                 Text(
-                        "\(result.systemicRisk)"
+                    "\(result.systemicRisk)"
                 )
                 .font(.title3.bold())
                 .foregroundStyle(
@@ -762,36 +773,40 @@ struct ContentView: View {
             }
 
             ProgressView(
-                value: min(
-                    max(
-                        result.systemicRisk,
-                        0.0
-                    ),
-                    1.0
-                )
+                value:
+                    min(
+                        max(
+                            result.systemicRisk,
+                            0.0
+                        ),
+                        1.0
+                    )
             )
 
             HStack {
 
                 metric(
                     title: "Exhaustion",
-                    value: percent(
-                        result.meanExhaustion
-                    )
+                    value:
+                        percent(
+                            result.meanExhaustion
+                        )
                 )
 
                 metric(
                     title: "Critical",
-                    value: percent(
-                        result.criticalFraction
-                    )
+                    value:
+                        percent(
+                            result.criticalFraction
+                        )
                 )
 
                 metric(
-                    title: "Release",
-                    value: percent(
-                        result.releaseFraction
-                    )
+                    title: "Crashed",
+                    value:
+                        percent(
+                            result.crashFraction
+                        )
                 )
             }
 
@@ -799,32 +814,35 @@ struct ContentView: View {
 
                 metric(
                     title: "Stress",
-                    value: percent(
-                        result.meanStress
-                    )
+                    value:
+                        percent(
+                            result.meanStress
+                        )
                 )
 
                 metric(
                     title: "Potential",
-                    value: percent(
-                        result.financialPotential
-                    )
+                    value:
+                        percent(
+                            result.financialPotential
+                        )
                 )
 
                 metric(
                     title: "Depletion",
-                    value: percent(
-                        result.energyDepletion
-                    )
+                    value:
+                        percent(
+                            result.energyDepletion
+                        )
                 )
             }
 
             Text(
                 "Systemic risk is an emergent cellular-automaton signal "
                 + "derived from exhaustion, stress, critical-cell "
-                + "concentration, release, energy depletion and financial "
-                + "potential. It is not calculated directly from banking "
-                + "stress or any single historical input."
+                + "concentration, crashed cells, energy depletion and "
+                + "financial potential. It is not calculated directly "
+                + "from banking stress or any single historical input."
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -942,9 +960,6 @@ struct ContentView: View {
 
     // ========================================================
     // MARK: Scenario
-    //
-    // No sliders.
-    // All scenario parameters are fixed model inputs.
     // ========================================================
 
     private var scenarioCard: some View {
@@ -1444,10 +1459,6 @@ struct ContentView: View {
     // MARK: Current Exhaustion
     // ========================================================
 
-    // ========================================================
-    // MARK: Current Exhaustion
-    // ========================================================
-
     private var exhaustionCard: some View {
 
         VStack(
@@ -1455,64 +1466,73 @@ struct ContentView: View {
             spacing: 10
         ) {
 
-            Text("Exhaustion & Financial Resistance")
-                .font(.headline)
+            Text(
+                "Exhaustion & Financial Resistance"
+            )
+            .font(.headline)
 
             HStack {
 
                 metric(
                     title: "Mean",
-                    value: percent(
-                        result.meanExhaustion
-                    )
+                    value:
+                        percent(
+                            result.meanExhaustion
+                        )
                 )
 
                 metric(
                     title: "Local",
-                    value: percent(
-                        result.localExhaustion
-                    )
+                    value:
+                        percent(
+                            result.localExhaustion
+                        )
                 )
 
                 metric(
                     title: "Total",
-                    value: percent(
-                        result.totalExhaustion
-                    )
+                    value:
+                        percent(
+                            result.totalExhaustion
+                        )
                 )
             }
 
             ProgressView(
-                value: max(
-                    0,
-                    min(
-                        1,
-                        result.totalExhaustion
+                value:
+                    max(
+                        0,
+                        min(
+                            1,
+                            result.totalExhaustion
+                        )
                     )
-                )
             )
 
             HStack {
 
                 metric(
                     title: "Banking Mass",
-                    value: percent(
-                        result.effectiveFinancialMass
-                    )
+                    value:
+                        percent(
+                            result.effectiveFinancialMass
+                        )
                 )
 
                 metric(
                     title: "Potential",
-                    value: percent(
-                        result.financialPotential
-                    )
+                    value:
+                        percent(
+                            result.financialPotential
+                        )
                 )
 
                 metric(
                     title: "Contagion",
-                    value: percent(
-                        result.contagion
-                    )
+                    value:
+                        percent(
+                            result.contagion
+                        )
                 )
             }
 
@@ -1533,6 +1553,7 @@ struct ContentView: View {
             )
         )
     }
+
     // ========================================================
     // MARK: Current Cellular Automaton
     // ========================================================
@@ -1612,7 +1633,7 @@ struct ContentView: View {
                 )
 
                 stateLegend(
-                    "Release",
+                    "Crashed",
                     .purple
                 )
             }
@@ -1632,14 +1653,19 @@ struct ContentView: View {
     // ========================================================
 
     private var riskCard: some View {
+
         VStack(
             alignment: .leading,
             spacing: 10
         ) {
-            Text("Systemic Risk")
-                .font(.headline)
+
+            Text(
+                "Systemic Risk"
+            )
+            .font(.headline)
 
             HStack {
+
                 Text(
                     exhaustionLabel(
                         result.systemicRisk
@@ -1663,13 +1689,14 @@ struct ContentView: View {
             }
 
             ProgressView(
-                value: min(
-                    max(
-                        result.systemicRisk,
-                        0.0
-                    ),
-                    1.0
-                )
+                value:
+                    min(
+                        max(
+                            result.systemicRisk,
+                            0.0
+                        ),
+                        1.0
+                    )
             )
 
             Text(
@@ -1687,6 +1714,7 @@ struct ContentView: View {
             )
         )
     }
+
     // ========================================================
     // MARK: Summary
     // ========================================================
@@ -1733,47 +1761,6 @@ struct ContentView: View {
             )
         }
         .font(.footnote)
-        .padding()
-        .background(
-            .thinMaterial,
-            in: RoundedRectangle(
-                cornerRadius: 16
-            )
-        )
-    }
-
-    // ========================================================
-    // MARK: Disclaimer
-    // ========================================================
-
-    private var disclaimerCard: some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 8
-        ) {
-
-            Text(
-                "Disclaimer"
-            )
-            .font(.headline)
-
-            Text(
-                "This is an experimental systems-dynamics and "
-                + "cellular-automaton visualization. Historical "
-                + "inputs and model weights must be connected to "
-                + "documented and validated time-series data before "
-                + "the model can be evaluated empirically."
-            )
-
-            Text(
-                "The model does not establish causation, does not "
-                + "guarantee future crashes, and is not financial, "
-                + "trading or investment advice."
-            )
-        }
-        .font(.footnote)
-        .foregroundStyle(.secondary)
         .padding()
         .background(
             .thinMaterial,
@@ -1836,7 +1823,9 @@ struct ContentView: View {
     private func cellColor(
         _ state: MarketState
     ) -> Color {
+
         switch state {
+
         case .stable:
             return .gray
 
@@ -1849,7 +1838,7 @@ struct ContentView: View {
         case .critical:
             return .red
 
-        case .released:
+        case .crashed:
             return .purple
         }
     }
@@ -1924,22 +1913,61 @@ struct ContentView: View {
     // ========================================================
 
     private func runSimulation() {
-        let input = HistoricalCAInput(
-            year: selectedYear,
-            growthM2: growthM2,
-            inflationPercent: inflationPercent,
-            taxGrowthPercent: taxGrowthPercent,
-            economicGrowthPercent: economicGrowthPercent,
-            stockGrowthPercent: stockGrowthPercent,
-            previousStockGrowthPercent: previousStockGrowthPercent,
-            growthBondPercent: bondYieldAvgPercent,
-            growthVolumePercent: growthVolumePercent,
-            cyclePressurePercent: crashInterval,
-            shockPressurePercent: externalShockPercent,
-            moneyPolicyChangeImpact: moneyPolicyChangeImpact,
-            bankingCreditStressRating: bankingCreditStressRating
-        )
-        result = engine.analyze(input:input)
+
+        let input =
+            HistoricalCAInput(
+
+                year:
+                    selectedYear,
+
+                growthM2:
+                    growthM2,
+
+                inflationPercent:
+                    inflationPercent,
+
+                taxGrowthPercent:
+                    taxGrowthPercent,
+
+                economicGrowthPercent:
+                    economicGrowthPercent,
+
+                stockGrowthPercent:
+                    stockGrowthPercent,
+
+                previousStockGrowthPercent:
+                    previousStockGrowthPercent,
+
+                growthBondPercent:
+                    bondYieldAvgPercent,
+
+                growthVolumePercent:
+                    growthVolumePercent,
+
+                cyclePressurePercent:
+                    crashInterval,
+
+                shockPressurePercent:
+                    externalShockPercent,
+
+                moneyPolicyChangeImpact:
+                    moneyPolicyChangeImpact,
+
+                bankingCreditStressRating:
+                    bankingCreditStressRating
+            )
+
+        // IMPORTANT:
+        //
+        // This call must return HistoricalCAResult.
+        //
+        // Do not change `result` to MarketRiskResult.
+        // Do not construct a second CA pipeline here.
+        //
+        result =
+            engine.analyze(
+                input: input
+            )
     }
 
     // ========================================================
@@ -1967,22 +1995,39 @@ struct ContentView: View {
         let engine =
             MarketExhaustionEngine()
 
-        let input = HistoricalCAInput(
-            year: 2026,
-            growthM2: 5,
-            inflationPercent: 3,
-            taxGrowthPercent: 5,
-            economicGrowthPercent: 3,
-            stockGrowthPercent: 12,
-            previousStockGrowthPercent: 20,
-            growthBondPercent: 4.5,
-            growthVolumePercent: 10,
-            cyclePressurePercent: 6,
-            shockPressurePercent: 0,
-            moneyPolicyChangeImpact: 0.60,
-            bankingCreditStressRating: 2.0
+        let input =
+            HistoricalCAInput(
+
+                year: 2026,
+
+                growthM2: 5,
+
+                inflationPercent: 3,
+
+                taxGrowthPercent: 5,
+
+                economicGrowthPercent: 3,
+
+                stockGrowthPercent: 12,
+
+                previousStockGrowthPercent: 20,
+
+                growthBondPercent: 4.5,
+
+                growthVolumePercent: 10,
+
+                cyclePressurePercent: 6,
+
+                shockPressurePercent: 0,
+
+                moneyPolicyChangeImpact: 0.60,
+
+                bankingCreditStressRating: 2.0
+            )
+
+        return engine.analyze(
+            input: input
         )
-            return engine.analyze(input:input)
     }
 }
 

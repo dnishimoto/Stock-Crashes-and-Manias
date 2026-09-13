@@ -36,1589 +36,1571 @@
 
  */
 
-
 import Foundation
-
-
-
-
-// ============================================================
-// MARK: - Market Exhaustion Engine
-// ============================================================
+import SwiftUI
+import SceneKit
+import Combine
 
 final class MarketExhaustionEngine {
 
     // ========================================================
-    // MARK: Grid
+    // MARK: - Historical Crash Records
     // ========================================================
+
+    private(set) var crashRecords: [CrashRecord] = [
+
+        CrashRecord(
+            year: 1907,
+            volumeMillions: 210.0
+        ),
+
+        CrashRecord(
+            year: 1929,
+            volumeMillions: 600.0
+        ),
+
+        CrashRecord(
+            year: 1937,
+            volumeMillions: 500.0
+        ),
+
+        CrashRecord(
+            year: 1962,
+            volumeMillions: 900.0
+        ),
+
+        CrashRecord(
+            year: 1970,
+            volumeMillions: 1100.0
+        ),
+
+        CrashRecord(
+            year: 1973,
+            volumeMillions: 1400.0
+        ),
+
+        CrashRecord(
+            year: 1974,
+            volumeMillions: 1500.0
+        ),
+
+        CrashRecord(
+            year: 1987,
+            volumeMillions: 3000.0
+        ),
+
+        CrashRecord(
+            year: 1990,
+            volumeMillions: 3200.0
+        ),
+
+        CrashRecord(
+            year: 2000,
+            volumeMillions: 5000.0
+        ),
+
+        CrashRecord(
+            year: 2008,
+            volumeMillions: 7000.0
+        ),
+
+        CrashRecord(
+            year: 2020,
+            volumeMillions: 9000.0
+        ),
+
+        CrashRecord(
+            year: 2022,
+            volumeMillions: 10000.0
+        )
+    ]
+
+    // ========================================================
+    // MARK: - Cellular Automaton
+    // ========================================================
+
+    private(set) var cells: [MarketCell] = []
 
     let gridWidth: Int
     let gridHeight: Int
 
-    private(set) var cells: [MarketCell] = []
-    private(set) var historicalFrames: [HistoricalCAFrame] = []
-
     // ========================================================
-    // MARK: State Thresholds
+    // MARK: - Centralized CA Configuration
     // ========================================================
 
-    private let risingThreshold = 0.20
-    private let stressedThreshold = 0.40
-    private let criticalStressThreshold = 0.65
-
-    private let releaseStressThreshold = 0.85
-    private let energyReleaseThreshold = 0.08
+    var parameters: CAParameters
 
     // ========================================================
-    // MARK: Cellular Dynamics
+    // MARK: - Year-by-Year Risk History
     // ========================================================
 
-    private let contagionRate = 0.20
-    private let stressContagionRate = 0.12
-    private let energyTransferRate = 0.06
-
-    private let dissipationRate = 0.08
-    private let exhaustionEnergyLossRate = 0.12
-    private let pressureEnergyLossRate = 0.10
-
-    private let momentumContagionRate = 0.08
+    private(set) var yearlyRiskHistory: [YearlyRiskSnapshot] = []
 
     // ========================================================
-    // MARK: Exhaustion Weights
+    // MARK: - Random Generator
     // ========================================================
 
-    private let inflationWeight = 0.15
-    private let taxationWeight = 0.15
-    private let stockSlowdownWeight = 0.20
-    private let bankingCreditWeight = 0.40
-    private let financialAttractorWeight = 0.10
+    private var random: CARandomGenerator
 
     // ========================================================
-    // MARK: Initialization
+    // MARK: - Initialization
     // ========================================================
 
     init(
         gridWidth: Int = 20,
-        gridHeight: Int = 20
+        gridHeight: Int = 12,
+        parameters: CAParameters = CAParameters()
     ) {
-        self.gridWidth = max(1, gridWidth)
-        self.gridHeight = max(1, gridHeight)
 
-        reset()
+        self.gridWidth = max(
+            gridWidth,
+            1
+        )
+
+        self.gridHeight = max(
+            gridHeight,
+            1
+        )
+
+        self.parameters =
+            parameters.normalized()
+
+        self.random =
+            CARandomGenerator(
+                seed: self.parameters.randomSeed
+            )
+
+        resetCells()
     }
 
     // ========================================================
-    // MARK: Reset
+    // MARK: - Historical Crash Intervals
     // ========================================================
 
-    func reset() {
+    func crashIntervals() -> [Double] {
 
-        cells.removeAll(keepingCapacity: true)
-        historicalFrames.removeAll(keepingCapacity: true)
+        guard crashRecords.count > 1 else {
+            return []
+        }
 
-        let count = gridWidth * gridHeight
+        return zip(
+            crashRecords.dropFirst(),
+            crashRecords
+        ).compactMap {
+            current,
+            previous in
 
-        cells = (0..<count).map { _ in
-            MarketCell()
+            let interval =
+                Double(
+                    current.year -
+                    previous.year
+                )
+
+            return interval > 0
+                ? interval
+                : nil
         }
     }
 
     // ========================================================
-    // MARK: Initialize Historical Grid
+    // MARK: - Power-Law Alpha
     // ========================================================
 
-    func initializeHistoricalGrid(
-        initialEnergy: Double = 0.50
-    ) {
+    func estimatePowerLawAlpha() -> Double {
 
-        let energy = clamp(
-            initialEnergy,
-            min: 0.0,
-            max: 1.0
+        estimatePowerLawAlpha(
+            upThroughCrashIndex:
+                crashRecords.count - 1
+        )
+    }
+
+    func estimatePowerLawAlpha(
+        upThroughCrashIndex crashIndex: Int
+    ) -> Double {
+
+        guard
+            crashIndex > 0,
+            crashRecords.count > 1
+        else {
+            return 2.0
+        }
+
+        let lastIndex =
+            min(
+                crashIndex,
+                crashRecords.count - 1
+            )
+
+        var intervals: [Double] = []
+
+        for index in 1...lastIndex {
+
+            let interval =
+                Double(
+                    crashRecords[index].year -
+                    crashRecords[index - 1].year
+                )
+
+            if interval > 0 {
+                intervals.append(interval)
+            }
+        }
+
+        guard !intervals.isEmpty else {
+            return 2.0
+        }
+
+        let xmin =
+            max(
+                intervals.min() ?? 1.0,
+                1.0
+            )
+
+        let logarithmicSum =
+            intervals.reduce(0.0) {
+                partial,
+                interval in
+
+                partial +
+                log(
+                    max(
+                        interval / xmin,
+                        1.000001
+                    )
+                )
+            }
+
+        guard logarithmicSum > 0 else {
+            return 2.0
+        }
+
+        let alpha =
+            1.0 +
+            Double(intervals.count) /
+            logarithmicSum
+
+        return min(
+            max(
+                alpha,
+                1.01
+            ),
+            10.0
+        )
+    }
+
+    // ========================================================
+    // MARK: - Power-Law Pressure
+    // ========================================================
+
+    func powerLawPressure(
+        yearsSinceCrash: Int
+    ) -> Double {
+
+        let intervals =
+            crashIntervals()
+
+        let alpha =
+            estimatePowerLawAlpha()
+
+        return powerLawPressure(
+            yearsSinceCrash:
+                yearsSinceCrash,
+            alpha:
+                alpha,
+            intervals:
+                intervals
+        )
+    }
+
+    private func powerLawPressure(
+        yearsSinceCrash: Int,
+        alpha: Double,
+        intervals: [Double]
+    ) -> Double {
+
+        guard !intervals.isEmpty else {
+            return 0
+        }
+
+        let xmin =
+            max(
+                intervals.min() ?? 1.0,
+                1.0
+            )
+
+        let x =
+            max(
+                Double(yearsSinceCrash),
+                xmin
+            )
+
+        let survivalProbability =
+            pow(
+                x / xmin,
+                -(alpha - 1.0)
+            )
+
+        return min(
+            max(
+                1.0 -
+                survivalProbability,
+                0.0
+            ),
+            1.0
+        )
+    }
+
+    // ========================================================
+    // MARK: - Volume Pressure
+    // ========================================================
+
+    func calculateVolumePressure() -> Double {
+
+        guard crashRecords.count >= 3 else {
+            return 0
+        }
+
+        return volumePressure(
+            recent:
+                crashRecords[
+                    crashRecords.count - 1
+                ].volumeMillions,
+
+            previous:
+                crashRecords[
+                    crashRecords.count - 2
+                ].volumeMillions,
+
+            older:
+                crashRecords[
+                    crashRecords.count - 3
+                ].volumeMillions
+        )
+    }
+
+    func calculateCurrentVolumePressure(
+        points: [MarketVolumePoint]
+    ) -> Double {
+
+        guard points.count >= 3 else {
+            return 0
+        }
+
+        let sorted =
+            points.sorted {
+                $0.date < $1.date
+            }
+
+        return volumePressure(
+            recent:
+                sorted[
+                    sorted.count - 1
+                ].volumeMillions,
+
+            previous:
+                sorted[
+                    sorted.count - 2
+                ].volumeMillions,
+
+            older:
+                sorted[
+                    sorted.count - 3
+                ].volumeMillions
+        )
+    }
+
+    func historicalVolumePressure(
+        crashIndex: Int
+    ) -> Double {
+
+        guard
+            crashIndex > 0,
+            crashIndex < crashRecords.count
+        else {
+            return 0
+        }
+
+        let recent =
+            crashRecords[
+                crashIndex
+            ].volumeMillions
+
+        let previous =
+            crashRecords[
+                crashIndex - 1
+            ].volumeMillions
+
+        let recentGrowth =
+            (
+                recent -
+                previous
+            ) /
+            max(
+                previous,
+                1.0
+            )
+
+        guard crashIndex >= 2 else {
+
+            return min(
+                max(
+                    0.7 *
+                    max(
+                        recentGrowth,
+                        0
+                    ),
+                    0
+                ),
+                1
+            )
+        }
+
+        let older =
+            crashRecords[
+                crashIndex - 2
+            ].volumeMillions
+
+        return volumePressure(
+            recent:
+                recent,
+            previous:
+                previous,
+            older:
+                older
+        )
+    }
+
+    private func volumePressure(
+        recent: Double,
+        previous: Double,
+        older: Double
+    ) -> Double {
+
+        let recentGrowth =
+            (
+                recent -
+                previous
+            ) /
+            max(
+                previous,
+                1.0
+            )
+
+        let previousGrowth =
+            (
+                previous -
+                older
+            ) /
+            max(
+                older,
+                1.0
+            )
+
+        let acceleration =
+            recentGrowth -
+            previousGrowth
+
+        let growthComponent =
+            min(
+                max(
+                    recentGrowth,
+                    0
+                ),
+                1
+            )
+
+        let accelerationComponent =
+            min(
+                max(
+                    acceleration * 4.0,
+                    0
+                ),
+                1
+            )
+
+        return min(
+            max(
+                0.7 *
+                growthComponent
+                +
+                0.3 *
+                accelerationComponent,
+                0
+            ),
+            1
+        )
+    }
+
+    // ========================================================
+    // MARK: - Initialize Cellular Automaton
+    // ========================================================
+
+    func resetCells() {
+
+        yearlyRiskHistory.removeAll(
+            keepingCapacity: true
         )
 
-        cells = (0..<(gridWidth * gridHeight)).map { _ in
+        // Re-seed the generator so a reset
+        // follows the configured random seed.
+        random =
+            CARandomGenerator(
+                seed:
+                    parameters.randomSeed
+            )
 
-            MarketCell(
-                energy: energy,
-                momentum: 0.0,
-                exhaustion: 0.0,
-                stress: 0.0,
-                financialPotential: 0.0,
-                state: .stable
+        cells = []
+
+        cells.reserveCapacity(
+            gridWidth *
+            gridHeight
+        )
+
+        // ----------------------------------------------------
+        // Enhancement 2:
+        //
+        // Give cells slightly different starting conditions.
+        // ----------------------------------------------------
+
+        for index in
+            0..<(gridWidth * gridHeight)
+        {
+
+            let x =
+                index %
+                gridWidth
+
+            let y =
+                index /
+                gridWidth
+
+            let deterministicSpatial =
+                spatialInitializationSignal(
+                    x: x,
+                    y: y
+                )
+
+            let randomVariation =
+                random.centeredUnit() *
+                parameters.spatialInitializationVariation
+
+            let initialStress =
+                min(
+                    max(
+                        deterministicSpatial +
+                        randomVariation,
+                        0
+                    ),
+                    parameters.risingThreshold *
+                    0.75
+                )
+
+            cells.append(
+                MarketCell(
+                    stress:
+                        initialStress,
+                    state:
+                        stateForStress(
+                            initialStress
+                        )
+                   
+                )
             )
         }
     }
 
     // ========================================================
-    // MARK: Normalize
+    // MARK: - Spatial Initialization Signal
     // ========================================================
 
-    private func normalize(
-        _ value: Double,
-        min lower: Double,
-        max upper: Double
+    private func spatialInitializationSignal(
+        x: Int,
+        y: Int
     ) -> Double {
 
-        guard value.isFinite,
-              lower.isFinite,
-              upper.isFinite,
-              upper > lower
+        guard
+            parameters.spatialInitializationVariation > 0
         else {
-            return 0.0
+            return 0
         }
 
-        return clamp(
-            (value - lower) / (upper - lower),
-            min: 0.0,
-            max: 1.0
-        )
+        let wave =
+            sin(
+                Double(x) * 0.73 +
+                Double(y) * 1.17
+            )
+
+        return abs(wave) *
+            parameters.spatialInitializationVariation
     }
 
     // ========================================================
-    // MARK: Signed Normalize
-    // ========================================================
-
-    private func normalizeSigned(
-        _ value: Double,
-        min lower: Double,
-        max upper: Double
-    ) -> Double {
-
-        guard value.isFinite,
-              lower.isFinite,
-              upper.isFinite,
-              upper > lower
-        else {
-            return 0.0
-        }
-
-        let midpoint = (lower + upper) / 2.0
-        let halfRange = (upper - lower) / 2.0
-
-        guard halfRange > 0 else {
-            return 0.0
-        }
-
-        return clamp(
-            (value - midpoint) / halfRange,
-            min: -1.0,
-            max: 1.0
-        )
-    }
-
-    // ========================================================
-    // MARK: Clamp
-    // ========================================================
-
-    private func clamp(
-        _ value: Double,
-        min lower: Double = 0.0,
-        max upper: Double = 1.0
-    ) -> Double {
-
-        guard value.isFinite else {
-            return lower
-        }
-
-        return Swift.min(
-            Swift.max(value, lower),
-            upper
-        )
-    }
-
-    // ========================================================
-    // MARK: Mean
-    // ========================================================
-
-    private func mean(
-        _ values: [Double]
-    ) -> Double {
-
-        let finiteValues = values.filter {
-            $0.isFinite
-        }
-
-        guard !finiteValues.isEmpty else {
-            return 0.0
-        }
-
-        return finiteValues.reduce(
-            0.0,
-            +
-        ) / Double(finiteValues.count)
-    }
-
-    // ========================================================
-    // MARK: Neighbors
+    // MARK: - Neighbor Indices
     // ========================================================
 
     private func neighborIndices(
         for index: Int
     ) -> [Int] {
 
-        guard index >= 0,
-              index < cells.count
-        else {
-            return []
-        }
+        let x =
+            index %
+            gridWidth
 
-        let x = index % gridWidth
-        let y = index / gridWidth
+        let y =
+            index /
+            gridWidth
 
-        var result: [Int] = []
+        var neighbors: [Int] = []
 
         for dy in -1...1 {
+
             for dx in -1...1 {
 
-                if dx == 0 && dy == 0 {
+                if dx == 0 &&
+                    dy == 0 {
                     continue
                 }
 
-                let nx = x + dx
-                let ny = y + dy
+                let nx =
+                    x + dx
 
-                guard nx >= 0,
-                      nx < gridWidth,
-                      ny >= 0,
-                      ny < gridHeight
+                let ny =
+                    y + dy
+
+                guard
+                    nx >= 0,
+                    nx < gridWidth,
+                    ny >= 0,
+                    ny < gridHeight
                 else {
                     continue
                 }
 
-                result.append(
-                    ny * gridWidth + nx
+                neighbors.append(
+                    ny *
+                    gridWidth +
+                    nx
                 )
             }
         }
 
-        return result
+        return neighbors
     }
 
     // ========================================================
-    // MARK: State Classification
+    // MARK: - Contagion
     // ========================================================
 
-    private func stateFor(
-        energy: Double,
-        stress: Double
-    ) -> MarketState {
-
-        if energy <= energyReleaseThreshold
-            || stress >= releaseStressThreshold {
-
-            return .released
-        }
-
-        if stress < risingThreshold {
-            return .stable
-        }
-
-        if stress < stressedThreshold {
-            return .rising
-        }
-
-        if stress < criticalStressThreshold {
-            return .stressed
-        }
-
-        return .critical
-    }
-
-    // ========================================================
-    // MARK: Money Supply Energy Change
-    // ========================================================
-
-    private func moneySupplyEnergyChange(
-        from growthM2: Double
+    private func contagionForCell(
+        at index: Int
     ) -> Double {
 
-        // ±20% M2 growth range maps to approximately ±1
-        // financial-energy forcing.
-
-        return normalizeSigned(
-            growthM2,
-            min: -20.0,
-            max: 20.0
-        )
-    }
-
-    // ========================================================
-    // MARK: Crash-Year Volume Initialization
-    // ========================================================
-
-    private func applyCrashYearVolume(
-        _ volumePressure: Double
-    ) {
-
-        let normalizedVolume = clamp(
-            volumePressure
-        )
-
-        for index in cells.indices {
-
-            let current = cells[index]
-
-            // Crash-year volume establishes an initial
-            // disturbance without completely replacing
-            // the accumulated historical state.
-
-            let newEnergy = clamp(
-                0.50 * current.energy
-                + 0.50 * (1.0 - normalizedVolume)
-            )
-
-            let newStress = clamp(
-                current.stress
-                + 0.20 * normalizedVolume
-            )
-
-            cells[index].energy = newEnergy
-            cells[index].stress = newStress
-        }
-    }
-
-    // ========================================================
-    // MARK: Step
-    // ========================================================
-
-    func step(
-        moneyPressure: Double,
-        moneyPolicyChangePressure: Double,
-        policyDirectionalForce: Double,
-        bankingCreditStressPressure: Double,
-        bankingPolicyInteraction: Double,
-        financialAttractorPressure: Double,
-        directionalFinancialForce: Double,
-        inflationPressure: Double,
-        taxationPressure: Double,
-        economicGrowthPressure: Double,
-        stockGrowthPressure: Double,
-        stockSlowdownPressure: Double,
-        bondPressure: Double,
-        volumePressure: Double,
-        cyclePressure: Double,
-        shockPressure: Double,
-        moneyEnergyChange: Double
-    ) {
-
-        // ----------------------------------------------------
-        // Synchronous CA update
-        // ----------------------------------------------------
-        //
-        // Every cell reads exclusively from currentCells.
-        // No cell can see a partially updated neighbor.
-
-        let currentCells = cells
-        var nextCells = currentCells
-
-        for index in currentCells.indices {
-
-            let current = currentCells[index]
-
-            let neighbors = neighborIndices(
+        let neighbors =
+            neighborIndices(
                 for: index
             )
 
-            let neighborCells = neighbors.map {
-                currentCells[$0]
-            }
-
-            let neighborEnergy = mean(
-                neighborCells.map {
-                    $0.energy
-                }
-            )
-
-            let neighborMomentum = mean(
-                neighborCells.map {
-                    $0.momentum
-                }
-            )
-
-            let neighborStress = mean(
-                neighborCells.map {
-                    $0.stress
-                }
-            )
-
-            let neighborExhaustion = mean(
-                neighborCells.map {
-                    $0.exhaustion
-                }
-            )
-
-            let neighborPotential = mean(
-                neighborCells.map {
-                    $0.financialPotential
-                }
-            )
-
-            // ------------------------------------------------
-            // Normalize incoming values
-            // ------------------------------------------------
-
-            let money = clamp(
-                moneyPressure
-            )
-
-            let bankingStress = clamp(
-                bankingCreditStressPressure
-            )
-
-            let policyMagnitude = clamp(
-                moneyPolicyChangePressure
-            )
-
-            let policyDirection = clamp(
-                policyDirectionalForce,
-                min: -1.0,
-                max: 1.0
-            )
-
-            let policyInteraction = clamp(
-                bankingPolicyInteraction
-            )
-
-            let financialAttractor = clamp(
-                financialAttractorPressure
-            )
-
-            let directionalFinancial = clamp(
-                directionalFinancialForce,
-                min: -1.0,
-                max: 1.0
-            )
-
-            // ------------------------------------------------
-            // Macro exhaustion inputs
-            // ------------------------------------------------
-
-            let inflationExhaustion = normalize(
-                inflationPressure
-                    * (1.0 + 0.60 * money),
-                min: 0.0,
-                max: 1.60
-            )
-
-            let taxationExhaustion = clamp(
-                taxationPressure
-            )
-
-            let stockGrowthExhaustion = clamp(
-                stockSlowdownPressure
-            )
-
-            let bankingCreditFragility = bankingStress
-
-            // ------------------------------------------------
-            // Existing local financial amplification
-            // ------------------------------------------------
-
-            let localFinancialAmplification = clamp(
-                0.40 * current.stress
-                + 0.30 * current.exhaustion
-                + 0.20 * (1.0 - current.energy)
-                + 0.10 * neighborStress
-            )
-
-            // ------------------------------------------------
-            // Nonlinear financial attractor
-            // ------------------------------------------------
-
-            let nonlinearFinancialAttractor = clamp(
-                financialAttractor
-                * (
-                    0.50
-                    + 0.50 * localFinancialAmplification
-                )
-            )
-
-            // ------------------------------------------------
-            // Financial Gravity:
-            // Effective Financial Mass
-            // ------------------------------------------------
-            //
-            // Banking/credit fragility behaves like effective
-            // financial mass. It increases sensitivity to
-            // existing financial forces.
-
-            let effectiveFinancialMass = clamp(
-                bankingCreditFragility
-            )
-
-            // ------------------------------------------------
-            // Financial Gravity:
-            // Signed Path Force
-            // ------------------------------------------------
-
-            let effectivePolicyForce = clamp(
-                policyDirection
-                    * (
-                        1.0
-                        + 0.75 * effectiveFinancialMass
-                    ),
-                min: -1.0,
-                max: 1.0
-            )
-
-            let effectiveDirectionalForce = clamp(
-                directionalFinancial
-                    * (
-                        1.0
-                        + 0.50 * effectiveFinancialMass
-                    ),
-                min: -1.0,
-                max: 1.0
-            )
-
-            let financialPathForce = clamp(
-                0.65 * effectivePolicyForce
-                + 0.35 * effectiveDirectionalForce,
-                min: -1.0,
-                max: 1.0
-            )
-
-            // ------------------------------------------------
-            // Historical pressure
-            // ------------------------------------------------
-
-            let historicalPressure = clamp(
-                0.15 * money
-                + 0.15 * inflationPressure
-                + 0.10 * taxationPressure
-                + 0.10 * economicGrowthPressure
-                + 0.15 * stockGrowthPressure
-                + 0.15 * stockSlowdownPressure
-                + 0.05 * bondPressure
-                + 0.05 * volumePressure
-                + 0.05 * cyclePressure
-                + 0.05 * shockPressure
-            )
-
-            // ------------------------------------------------
-            // Internal exhaustion
-            // ------------------------------------------------
-            //
-            // 15% inflation
-            // 15% taxation
-            // 20% stock slowdown
-            // 40% banking/credit fragility
-            // 10% nonlinear financial attractor
-
-            let internalExhaustion = clamp(
-                inflationWeight
-                    * inflationExhaustion
-                + taxationWeight
-                    * taxationExhaustion
-                + stockSlowdownWeight
-                    * stockGrowthExhaustion
-                + bankingCreditWeight
-                    * bankingCreditFragility
-                + financialAttractorWeight
-                    * nonlinearFinancialAttractor
-            )
-
-            // ------------------------------------------------
-            // Financial potential
-            // ------------------------------------------------
-            //
-            // Potential represents accumulated resistance /
-            // instability in the financial field.
-
-            let baseContagionBeforePotential = clamp(
-                0.20 * current.exhaustion
-                + 0.12 * neighborStress
-                + 0.15 * (1.0 - neighborEnergy)
-            )
-
-            let equilibriumPressure = clamp(
-                0.30 * stockGrowthExhaustion
-                + 0.15 * inflationExhaustion
-                + 0.10 * taxationExhaustion
-                + 0.10 * bondPressure
-                + 0.05 * volumePressure
-                + 0.05 * cyclePressure
-                + 0.05 * neighborStress
-                + 0.10 * bankingCreditFragility
-                + 0.10 * nonlinearFinancialAttractor
-            )
-
-            // ------------------------------------------------
-            // Base momentum drive
-            // ------------------------------------------------
-
-            let baseMomentumDrive =
-                0.25 * money
-                + 0.20 * stockGrowthPressure
-                + 0.15 * economicGrowthPressure
-                + 0.10 * volumePressure
-                + 0.10 * current.momentum
-                + 0.10 * neighborMomentum
-
-            // ------------------------------------------------
-            // Financial potential
-            // ------------------------------------------------
-
-            let financialPotential = clamp(
-                0.40 * internalExhaustion
-                + 0.20 * (1.0 - current.energy)
-                + 0.15 * effectiveFinancialMass
-                + 0.15 * clamp(
-                    equilibriumPressure
-                    - baseMomentumDrive
-                )
-                + 0.10 * baseContagionBeforePotential
-            )
-
-            // ------------------------------------------------
-            // Potential gradient
-            // ------------------------------------------------
-
-            let potentialGradient = clamp(
-                neighborPotential - financialPotential,
-                min: -1.0,
-                max: 1.0
-            )
-
-            // ------------------------------------------------
-            // Equilibrium inflection
-            // ------------------------------------------------
-            //
-            // Positive values indicate that pressure exceeds
-            // the current financial trajectory.
-
-            let preliminaryMomentumDrive = clamp(
-                baseMomentumDrive
-                + 0.10 * financialPathForce
-                + 0.10 * potentialGradient,
-                min: -1.0,
-                max: 1.0
-            )
-
-            let equilibriumInflection = clamp(
-                equilibriumPressure
-                    - preliminaryMomentumDrive
-            )
-
-            // ------------------------------------------------
-            // Contagion
-            // ------------------------------------------------
-            //
-            // Banking fragility amplifies existing contagion.
-            // It does not create contagion from zero.
-
-            let exhaustionContagion = clamp(
-                0.20 * current.exhaustion
-            )
-
-            let stressContagion = clamp(
-                0.12 * neighborStress
-            )
-
-            let depletionContagion = clamp(
-                0.15 * (1.0 - neighborEnergy)
-            )
-
-            let baseContagion = clamp(
-                exhaustionContagion
-                + stressContagion
-                + depletionContagion
-            )
-
-            let financialContagionAmplifier = clamp(
-                1.0
-                + 0.50 * effectiveFinancialMass
-                + 0.50 * policyInteraction
-                + 0.50 * financialAttractor
-                + 0.50 * abs(potentialGradient),
-                min: 1.0,
-                max: 3.0
-            )
-
-            let contagion = clamp(
-                baseContagion
-                    * financialContagionAmplifier
-            )
-
-            // ------------------------------------------------
-            // Local exhaustion
-            // ------------------------------------------------
-            //
-            // Internal exhaustion remains the dominant
-            // contributor.
-            //
-            // Potential gradient is used as a field-instability
-            // contribution rather than double-counting the
-            // attractor.
-
-            let contagionExhaustion = clamp(
-                contagion
-            )
-
-            let intervalExhaustion = clamp(
-                0.15 * cyclePressure
-            )
-
-            let localExhaustion = clamp(
-                0.70 * internalExhaustion
-                + 0.15 * contagionExhaustion
-                + 0.05 * historicalPressure
-                + 0.05 * intervalExhaustion
-                + 0.03 * equilibriumInflection
-                + 0.02 * abs(potentialGradient)
-            )
-
-            // ------------------------------------------------
-            // Energy transfer
-            // ------------------------------------------------
-
-            let energyTransfer = clamp(
-                energyTransferRate
-                    * (neighborEnergy - current.energy),
-                min: -energyTransferRate,
-                max: energyTransferRate
-            )
-
-            // ------------------------------------------------
-            // Monetary energy
-            // ------------------------------------------------
-
-            let monetaryEnergyBoost = clamp(
-                moneyEnergyChange,
-                min: -1.0,
-                max: 1.0
-            )
-
-            // ------------------------------------------------
-            // Financial force → energy
-            // ------------------------------------------------
-            //
-            // Force acts on moving financial energy.
-            // Banking fragility increases sensitivity.
-
-            let financialEnergyEffect = clamp(
-                0.06
-                    * financialPathForce
-                    * current.momentum
-                    * (
-                        0.50
-                        + 0.50 * effectiveFinancialMass
-                    ),
-                min: -0.06,
-                max: 0.06
-            )
-
-            // ------------------------------------------------
-            // Dissipation
-            // ------------------------------------------------
-
-            let dissipation = clamp(
-                0.06
-                + 0.10 * localExhaustion
-                + 0.08 * financialPotential
-                + 0.08 * historicalPressure
-                + 0.05 * contagionExhaustion
-                + 0.03 * nonlinearFinancialAttractor,
-                min: 0.0,
-                max: 0.40
-            )
-
-            // ------------------------------------------------
-            // Next energy
-            // ------------------------------------------------
-
-            let nextEnergy = clamp(
-                current.energy
-                + monetaryEnergyBoost
-                + energyTransfer
-                + financialEnergyEffect
-                - dissipation
-            )
-
-            let energyDepletion = clamp(
-                1.0 - nextEnergy
-            )
-
-            // ------------------------------------------------
-            // Total exhaustion
-            // ------------------------------------------------
-
-            let totalExhaustion = clamp(
-                0.70 * localExhaustion
-                + 0.10 * energyDepletion
-                + 0.10 * contagionExhaustion
-                + 0.05 * equilibriumInflection
-                + 0.03 * shockPressure
-                + 0.02 * financialPotential
-            )
-
-            // ------------------------------------------------
-            // Stress
-            // ------------------------------------------------
-
-            let financialStressResponse = clamp(
-                effectiveFinancialMass
-                    * (
-                        0.50
-                        + 0.50
-                            * nonlinearFinancialAttractor
-                    )
-            )
-
-            let nextStress = clamp(
-                0.30 * totalExhaustion
-                + 0.20 * contagionExhaustion
-                + 0.15 * equilibriumInflection
-                + 0.15 * energyDepletion
-                + 0.05 * bondPressure
-                + 0.05 * shockPressure
-                + 0.10 * financialStressResponse
-            )
-
-            // ------------------------------------------------
-            // Momentum
-            // ------------------------------------------------
-
-            let momentumDrive = clamp(
-                baseMomentumDrive
-                + 0.10 * financialPathForce
-                + 0.10 * potentialGradient,
-                min: -1.0,
-                max: 1.0
-            )
-
-            let monetaryMomentumEffect =
-                0.08 * monetaryEnergyBoost
-
-            let financialMomentumEffect =
-                0.10 * financialPathForce
-
-            let momentumGain =
-                0.12 * momentumDrive
-                + monetaryMomentumEffect
-                + financialMomentumEffect
-
-            let momentumLoss =
-                0.10 * totalExhaustion
-                + 0.08 * equilibriumInflection
-                + 0.05 * energyDepletion
-                + 0.07 * financialPotential
-
-            let neighborMomentumEffect =
-                momentumContagionRate
-                    * (neighborMomentum - current.momentum)
-
-            let financialMomentumFeedback = clamp(
-                financialPathForce
-                    * effectiveFinancialMass
-                    * (
-                        0.05
-                        + 0.05 * current.stress
-                        + 0.05 * contagionExhaustion
-                    ),
-                min: -0.15,
-                max: 0.15
-            )
-
-            let nextMomentum = clamp(
-                current.momentum
-                + momentumGain
-                - momentumLoss
-                + neighborMomentumEffect
-                + financialMomentumFeedback,
-                min: -1.0,
-                max: 1.0
-            )
-
-            // ------------------------------------------------
-            // Next state
-            // ------------------------------------------------
-
-            let nextState = stateFor(
-                energy: nextEnergy,
-                stress: nextStress
-            )
-
-            // ------------------------------------------------
-            // Store next cell
-            // ------------------------------------------------
-
-            nextCells[index].energy = nextEnergy
-            nextCells[index].momentum = nextMomentum
-            nextCells[index].exhaustion = totalExhaustion
-            nextCells[index].stress = nextStress
-            nextCells[index].financialPotential =
-                financialPotential
-            nextCells[index].state = nextState
+        guard !neighbors.isEmpty else {
+            return 0
         }
 
-        // ----------------------------------------------------
-        // Commit simultaneously
-        // ----------------------------------------------------
+        let totalStress =
+            neighbors.reduce(0.0) {
+                result,
+                neighborIndex in
 
-        cells = nextCells
+                result +
+                cells[
+                    neighborIndex
+                ].stress
+            }
+
+        return min(
+            max(
+                totalStress /
+                Double(
+                    neighbors.count
+                ),
+                0
+            ),
+            1
+        )
     }
 
     // ========================================================
-    // MARK: Historical Year
+    // MARK: - Cell Transition
     // ========================================================
 
-    func runHistoricalYear(
-        input: HistoricalCAInput,
-        isCrashYear: Bool = false
+    private func stateForStress(
+        _ stress: Double
+    ) -> MarketState {
+
+        switch stress {
+
+        case ..<parameters.risingThreshold:
+            return .stable
+
+        case ..<parameters.stressedThreshold:
+            return .rising
+
+        case ..<parameters.criticalThreshold:
+            return .stressed
+
+        case ..<parameters.crashThreshold:
+            return .critical
+
+        default:
+            // Current MarketState uses .crashed
+            // as the terminal CA state.
+            return .crashed
+        }
+    }
+
+    // ========================================================
+    // MARK: - Spatial Signal
+    // ========================================================
+
+    private func spatialSignal(
+        x: Int,
+        y: Int
+    ) -> Double {
+
+        guard
+            parameters.spatialSignalAmplitude > 0
+        else {
+            return 0
+        }
+
+        return abs(
+            sin(
+                Double(x) * 0.73 +
+                Double(y) * 1.17
+            )
+        ) *
+        parameters.spatialSignalAmplitude
+    }
+
+    // ========================================================
+    // MARK: - Stochastic Noise
+    // ========================================================
+
+    private func stochasticNoise() -> Double {
+
+        guard
+            parameters.stochasticNoiseAmplitude > 0
+        else {
+            return 0
+        }
+
+        return random.centeredUnit() *
+            parameters.stochasticNoiseAmplitude
+    }
+
+    // ========================================================
+    // MARK: - Single CA Generation
+    // ========================================================
+
+    func step(
+        equilibriumPressure: Double,
+        volumePressure: Double
     ) {
 
-        let moneyPressure = normalize(
-            input.growthM2,
-            min: -5.0,
-            max: 20.0
-        )
-
-        let bankingCreditStressPressure = normalize(
-            input.bankingCreditStressRating,
-            min: 0.0,
-            max: 5.0
-        )
-
-        let moneyPolicyDirection = normalizeSigned(
-            input.moneyPolicyChangeImpact,
-            min: -6.0,
-            max: 6.0
-        )
-
-        let moneyPolicyChangePressure =
-            abs(moneyPolicyDirection)
-
-        let bankingPolicyInteraction = clamp(
-            bankingCreditStressPressure
-                * moneyPolicyChangePressure
-        )
-
-        let policyDirectionalForce = clamp(
-            moneyPolicyDirection,
-            min: -1.0,
-            max: 1.0
-        )
-
-        let financialAttractorPressure = clamp(
-            0.25 * bankingCreditStressPressure
-            + 0.60 * bankingPolicyInteraction
-            + 0.15 * moneyPolicyChangePressure
-        )
-
-        let directionalFinancialForce = clamp(
-            policyDirectionalForce
-                * (
-                    0.50
-                    + 0.50 * bankingCreditStressPressure
+        let normalizedEquilibrium =
+            min(
+                max(
+                    equilibriumPressure,
+                    0
                 ),
-            min: -1.0,
-            max: 1.0
-        )
-
-        let inflationPressure = normalize(
-            input.inflationPercent,
-            min: -5.0,
-            max: 15.0
-        )
-
-        let taxationPressure = normalize(
-            input.taxGrowthPercent
-                - input.economicGrowthPercent,
-            min: -5.0,
-            max: 15.0
-        )
-
-        let economicGrowthPressure = normalize(
-            input.economicGrowthPercent,
-            min: -10.0,
-            max: 15.0
-        )
-
-        let stockGrowthPressure = normalize(
-            input.stockGrowthPercent,
-            min: -50.0,
-            max: 100.0
-        )
-
-        let stockSlowdownPressure = normalize(
-            -(
-                input.stockGrowthPercent
-                - input.previousStockGrowthPercent
-            ),
-            min: 0.0,
-            max: 30.0
-        )
-
-        let bondPressure = normalize(
-            input.growthBondPercent,
-            min: 0.0,
-            max: 15.0
-        )
-
-        let volumePressure = normalize(
-            input.growthVolumePercent,
-            min: -50.0,
-            max: 300.0
-        )
-
-        let cyclePressure = normalize(
-            input.cyclePressurePercent,
-            min: 0.0,
-            max: 25.0
-        )
-
-        let shockPressure = normalize(
-            input.shockPressurePercent,
-            min: 0.0,
-            max: 100.0
-        )
-
-        let moneyEnergyChange =
-            moneySupplyEnergyChange(
-                from: input.growthM2
+                1
             )
 
-        step(
-            moneyPressure: moneyPressure,
-            moneyPolicyChangePressure:
-                moneyPolicyChangePressure,
-            policyDirectionalForce:
-                policyDirectionalForce,
-            bankingCreditStressPressure:
-                bankingCreditStressPressure,
-            bankingPolicyInteraction:
-                bankingPolicyInteraction,
-            financialAttractorPressure:
-                financialAttractorPressure,
-            directionalFinancialForce:
-                directionalFinancialForce,
-            inflationPressure:
-                inflationPressure,
-            taxationPressure:
-                taxationPressure,
-            economicGrowthPressure:
-                economicGrowthPressure,
-            stockGrowthPressure:
-                stockGrowthPressure,
-            stockSlowdownPressure:
-                stockSlowdownPressure,
-            bondPressure:
-                bondPressure,
-            volumePressure:
-                volumePressure,
-            cyclePressure:
-                cyclePressure,
-            shockPressure:
-                shockPressure,
-            moneyEnergyChange:
-                moneyEnergyChange
-        )
+        let normalizedVolume =
+            min(
+                max(
+                    volumePressure,
+                    0
+                ),
+                1
+            )
 
-        historicalFrames.append(
-            makeHistoricalFrame(
-                year: input.year,
-                isCrashYear: isCrashYear,
-                moneyEnergyChange:
-                    moneyEnergyChange,
+        var nextCells =
+            cells
+
+        for index in
+            cells.indices {
+
+            let contagion =
+                contagionForCell(
+                    at: index
+                )
+
+            let x =
+                index %
+                gridWidth
+
+            let y =
+                index /
+                gridWidth
+
+            let pressure =
+                parameters.equilibriumWeight *
+                normalizedEquilibrium
+                +
+                parameters.volumeWeight *
+                normalizedVolume
+                +
+                parameters.contagionWeight *
+                contagion
+                +
+                spatialSignal(
+                    x: x,
+                    y: y
+                )
+                +
+                stochasticNoise()
+
+            let boundedPressure =
+                min(
+                    max(
+                        pressure,
+                        0
+                    ),
+                    1
+                )
+
+            nextCells[index] =
+                MarketCell(
+                    stress:
+                        boundedPressure,
+                    state:
+                        stateForStress(
+                            boundedPressure
+                        )
+                
+                )
+        }
+
+        cells =
+            nextCells
+    }
+
+    // ========================================================
+    // MARK: - Multiple CA Generations
+    // ========================================================
+
+    func run(
+        generations: Int,
+        equilibriumPressure: Double,
+        volumePressure: Double
+    ) {
+
+        let count =
+            max(
+                generations,
+                0
+            )
+
+        guard count > 0 else {
+            return
+        }
+
+        for _ in 0..<count {
+
+            step(
+                equilibriumPressure:
+                    equilibriumPressure,
                 volumePressure:
                     volumePressure
             )
-        )
+        }
     }
 
     // ========================================================
-    // MARK: Historical Frame
+    // MARK: - Run One Calendar Year
     // ========================================================
 
-    private func makeHistoricalFrame(
+    @discardableResult
+    func runYear(
         year: Int,
-        isCrashYear: Bool,
-        moneyEnergyChange: Double,
+        equilibriumPressure: Double,
+        volumePressure: Double,
+        generationsPerYear: Int? = nil
+    ) -> YearlyRiskSnapshot {
+
+        let generations =
+            max(
+                generationsPerYear ??
+                parameters.generationsPerYear,
+                1
+            )
+
+        // Multiple internal generations occur
+        // inside one calendar year.
+        run(
+            generations:
+                generations,
+            equilibriumPressure:
+                equilibriumPressure,
+            volumePressure:
+                volumePressure
+        )
+
+        let snapshot =
+            makeYearlyRiskSnapshot(
+                year:
+                    year,
+                generationCount:
+                    generations,
+                equilibriumPressure:
+                    equilibriumPressure,
+                volumePressure:
+                    volumePressure
+            )
+
+        yearlyRiskHistory.append(
+            snapshot
+        )
+
+        return snapshot
+    }
+
+    // ========================================================
+    // MARK: - Yearly Risk Snapshot
+    // ========================================================
+
+    private func makeYearlyRiskSnapshot(
+        year: Int,
+        generationCount: Int,
+        equilibriumPressure: Double,
         volumePressure: Double
-    ) -> HistoricalCAFrame {
+    ) -> YearlyRiskSnapshot {
 
-        HistoricalCAFrame(
-            year: year,
-            isCrashYear: isCrashYear,
-            moneyEnergyChange: moneyEnergyChange,
-            volumePressure: volumePressure,
-            cells: cells
+        let localStress =
+            cellularStress()
+
+        let critical =
+            criticalCellFraction()
+
+        let crash =
+            crashCellFraction()
+
+        let risk =
+            systemicRisk(
+                equilibriumPressure:
+                    equilibriumPressure,
+                volumePressure:
+                    volumePressure
+            )
+
+        return YearlyRiskSnapshot(
+            year:
+                year,
+
+            generationCount:
+                generationCount,
+
+            equilibriumPressure:
+                equilibriumPressure,
+
+            volumePressure:
+                volumePressure,
+
+            cellularStress:
+                localStress,
+
+            criticalFraction:
+                critical,
+
+            crashFraction:
+                crash,
+
+            systemicRisk:
+                risk,
+
+            riskLevel:
+                riskLevel(risk),
+
+            cells:
+                cells
         )
     }
 
     // ========================================================
-    // MARK: Analyze Historical Sequence
+    // MARK: - Cellular Stress
     // ========================================================
 
-    func analyzeHistoricalSequence(
-        priorYears: [HistoricalCAInput],
-        crashYear: HistoricalCAInput
-    ) -> HistoricalCAResult {
+    func cellularStress() -> Double {
 
-        reset()
+        guard !cells.isEmpty else {
+            return 0
+        }
 
-        initializeHistoricalGrid(
-            initialEnergy: 0.50
+        return cells.reduce(0.0) {
+            $0 +
+            $1.stress
+        }
+        /
+        Double(
+            cells.count
         )
+    }
 
-        historicalFrames.removeAll(
-            keepingCapacity: true
-        )
+    // ========================================================
+    // MARK: - Critical Cell Fraction
+    // ========================================================
 
-        let sortedPriorYears = priorYears
-            .filter {
-                $0.year < crashYear.year
-            }
-            .sorted {
-                $0.year < $1.year
-            }
+    func criticalCellFraction() -> Double {
 
-        // ----------------------------------------------------
-        // Accumulate historical conditions.
-        // ----------------------------------------------------
+        guard !cells.isEmpty else {
+            return 0
+        }
 
-        for year in sortedPriorYears {
+        let count =
+            cells.filter {
 
-            runHistoricalYear(
-                input: year,
-                isCrashYear: false
+                $0.state == .critical ||
+                $0.state == .crashed
+
+            }.count
+
+        return Double(count) /
+            Double(cells.count)
+    }
+
+    // ========================================================
+    // MARK: - Crashed Cell Fraction
+    // ========================================================
+
+    func crashCellFraction() -> Double {
+
+        guard !cells.isEmpty else {
+            return 0
+        }
+
+        let count =
+            cells.filter {
+                $0.state == .crashed
+            }.count
+
+        return Double(count) /
+            Double(cells.count)
+    }
+
+    // ========================================================
+    // MARK: - Systemic Risk
+    // ========================================================
+
+    func systemicRisk(
+        equilibriumPressure: Double,
+        volumePressure: Double
+    ) -> Double {
+
+        let localStress =
+            cellularStress()
+
+        let critical =
+            criticalCellFraction()
+
+        let crash =
+            crashCellFraction()
+
+        let equilibrium =
+            min(
+                max(
+                    equilibriumPressure,
+                    0
+                ),
+                1
             )
-        }
 
-        // ----------------------------------------------------
-        // Crash-year volume initialization.
-        // ----------------------------------------------------
-        //
-        // Volume establishes an initial crash-year disturbance.
-        // The crash-year itself is then processed normally.
+        let volume =
+            min(
+                max(
+                    volumePressure,
+                    0
+                ),
+                1
+            )
 
-        let crashVolumePressure = normalize(
-            crashYear.growthVolumePercent,
-            min: -50.0,
-            max: 300.0
-        )
+        let risk =
+            parameters.systemicEquilibriumWeight *
+            equilibrium
+            +
+            parameters.systemicVolumeWeight *
+            volume
+            +
+            parameters.systemicStressWeight *
+            localStress
+            +
+            parameters.systemicCriticalWeight *
+            critical
+            +
+            parameters.systemicCrashWeight *
+            crash
 
-        applyCrashYearVolume(
-            crashVolumePressure
-        )
-
-        runHistoricalYear(
-            input: crashYear,
-            isCrashYear: true
-        )
-
-        // ----------------------------------------------------
-        // Aggregate final CA state.
-        // ----------------------------------------------------
-
-        let finalMeanEnergy = mean(
-            cells.map {
-                $0.energy
-            }
-        )
-
-        let finalMeanMomentum = mean(
-            cells.map {
-                $0.momentum
-            }
-        )
-
-        let finalMeanExhaustion = mean(
-            cells.map {
-                $0.exhaustion
-            }
-        )
-
-        let finalMeanStress = mean(
-            cells.map {
-                $0.stress
-            }
-        )
-
-        let finalMeanFinancialPotential = mean(
-            cells.map {
-                $0.financialPotential
-            }
-        )
-
-        let criticalFraction = fraction(
-            of: cells
-        ) {
-            $0.state == .critical
-        }
-
-        let releaseFraction = fraction(
-            of: cells
-        ) {
-            $0.state == .released
-        }
-
-        let energyDepletion = clamp(
-            1.0 - finalMeanEnergy
-        )
-
-        // ----------------------------------------------------
-        // Crash-year normalized inputs
-        // ----------------------------------------------------
-
-        let inflationPressure = normalize(
-            crashYear.inflationPercent,
-            min: -5.0,
-            max: 15.0
-        )
-
-        let stockSlowdown = normalize(
-            -(
-                crashYear.stockGrowthPercent
-                - crashYear.previousStockGrowthPercent
+        return min(
+            max(
+                risk,
+                0
             ),
-            min: 0.0,
-            max: 30.0
-        )
-
-        let shockPressure = normalize(
-            crashYear.shockPressurePercent,
-            min: 0.0,
-            max: 100.0
-        )
-
-        let bankingStress = normalize(
-            crashYear.bankingCreditStressRating,
-            min: 0.0,
-            max: 5.0
-        )
-
-        // ----------------------------------------------------
-        // Policy direction
-        // ----------------------------------------------------
-
-        let moneyPolicyDirection = normalizeSigned(
-            crashYear.moneyPolicyChangeImpact,
-            min: -6.0,
-            max: 6.0
-        )
-
-        let moneyPolicyChangePressure =
-            abs(moneyPolicyDirection)
-
-        let bankingPolicyInteraction = clamp(
-            bankingStress
-                * moneyPolicyChangePressure
-        )
-
-        let policyDirectionalForce = clamp(
-            moneyPolicyDirection,
-            min: -1.0,
-            max: 1.0
-        )
-
-        let financialAttractorPressure = clamp(
-            0.25 * bankingStress
-            + 0.60 * bankingPolicyInteraction
-            + 0.15 * moneyPolicyChangePressure
-        )
-
-        let directionalFinancialForce = clamp(
-            policyDirectionalForce
-                * (
-                    0.50
-                    + 0.50 * bankingStress
-                ),
-            min: -1.0,
-            max: 1.0
-        )
-
-        // ----------------------------------------------------
-        // Equilibrium
-        // ----------------------------------------------------
-
-        let bondPressure = normalize(
-            crashYear.growthBondPercent,
-            min: 0.0,
-            max: 15.0
-        )
-
-        let volumePressure = normalize(
-            crashYear.growthVolumePercent,
-            min: -50.0,
-            max: 300.0
-        )
-
-        let cyclePressure = normalize(
-            crashYear.cyclePressurePercent,
-            min: 0.0,
-            max: 25.0
-        )
-
-        let taxationPressure = normalize(
-            crashYear.taxGrowthPercent
-                - crashYear.economicGrowthPercent,
-            min: -5.0,
-            max: 15.0
-        )
-
-        let equilibriumPressure = clamp(
-            0.30 * stockSlowdown
-            + 0.15 * inflationPressure
-            + 0.10 * taxationPressure
-            + 0.10 * bondPressure
-            + 0.05 * volumePressure
-            + 0.05 * cyclePressure
-            + 0.10 * finalMeanStress
-            + 0.10 * bankingStress
-            + 0.05 * financialAttractorPressure
-        )
-
-        let aggregateMomentumDrive = clamp(
-            0.20 * normalize(
-                crashYear.growthM2,
-                min: -5.0,
-                max: 20.0
-            )
-            + 0.20 * normalize(
-                crashYear.stockGrowthPercent,
-                min: -50.0,
-                max: 100.0
-            )
-            + 0.10 * normalize(
-                crashYear.economicGrowthPercent,
-                min: -10.0,
-                max: 15.0
-            )
-            + 0.10 * volumePressure
-            + 0.10 * finalMeanMomentum
-            + 0.15 * directionalFinancialForce
-            + 0.15 * financialAttractorPressure
-        )
-
-        let equilibriumInflection = clamp(
-            equilibriumPressure
-                - aggregateMomentumDrive
-        )
-
-        // ----------------------------------------------------
-        // Useful fuel
-        // ----------------------------------------------------
-
-        let usefulFuel = clamp(
-            finalMeanEnergy
-                * (1.0 - finalMeanExhaustion)
-        )
-
-        // ----------------------------------------------------
-        // Overdrive pressure
-        // ----------------------------------------------------
-
-        let overdrivePressure = clamp(
-            finalMeanEnergy
-                * finalMeanMomentum
-                * (
-                    finalMeanExhaustion
-                    + finalMeanStress
-                ),
-            min: -1.0,
-            max: 1.0
-        )
-
-        // ----------------------------------------------------
-        // Emergent systemic risk
-        // ----------------------------------------------------
-        //
-        // The final systemic-risk score is deliberately based
-        // primarily on the state produced by the CA.
-        //
-        // Raw macro variables affect the CA upstream.
-        // They are not repeatedly counted here.
-        //
-        // 25% exhaustion
-        // 20% stress
-        // 20% critical cells
-        // 15% released cells
-        // 10% energy depletion
-        // 10% financial potential
-        //
-        // Total = 100%.
-
-        let systemicRisk = clamp(
-            0.25 * finalMeanExhaustion
-            + 0.20 * finalMeanStress
-            + 0.20 * criticalFraction
-            + 0.15 * releaseFraction
-            + 0.10 * energyDepletion
-            + 0.10 * finalMeanFinancialPotential
-        )
-
-        // ----------------------------------------------------
-        // Financial-gravity / cellular-automaton detail
-        // ----------------------------------------------------
-
-        let potentialGradient =
-            aggregatePotentialGradient()
-
-        // "Local" exhaustion surfaces the worst single cell,
-        // as distinct from the grid-wide mean.
-
-        let localExhaustion = cells
-            .map { $0.exhaustion }
-            .max() ?? finalMeanExhaustion
-
-        // "Total" exhaustion is a system-wide composite that
-        // also weighs how far exhaustion has already spread
-        // into critical/release cells, rather than a plain
-        // average.
-
-        let totalExhaustion = clamp(
-            0.60 * finalMeanExhaustion
-            + 0.25 * criticalFraction
-            + 0.15 * releaseFraction
-        )
-
-        // Effective financial mass mirrors the per-cell
-        // definition used during step(): banking/credit
-        // fragility behaves like mass.
-
-        let effectiveFinancialMass = bankingStress
-
-        // Aggregate nonlinear financial attractor, following
-        // the same shape as the per-cell version but driven by
-        // the grid-wide financial potential.
-
-        let nonlinearFinancialAttractor = clamp(
-            financialAttractorPressure
-                * (
-                    0.50
-                    + 0.50 * finalMeanFinancialPotential
-                )
-        )
-
-        let contagion = clamp(
-            0.50 * finalMeanExhaustion
-            + 0.30 * finalMeanStress
-            + 0.20 * potentialGradient
-        )
-
-        return HistoricalCAResult(
-            crashYear: crashYear.year,
-
-            meanEnergy: finalMeanEnergy,
-            meanMomentum: finalMeanMomentum,
-            meanExhaustion: finalMeanExhaustion,
-            meanStress: finalMeanStress,
-            meanFinancialPotential:
-                finalMeanFinancialPotential,
-
-            criticalFraction: criticalFraction,
-            releaseFraction: releaseFraction,
-
-            energyDepletion: energyDepletion,
-            stockSlowdown: stockSlowdown,
-            inflationPressure: inflationPressure,
-            shockPressure: shockPressure,
-
-            bankingStress: bankingStress,
-            bankingPolicyInteraction:
-                bankingPolicyInteraction,
-
-            equilibriumPressure: equilibriumPressure,
-            equilibriumInflection:
-                equilibriumInflection,
-
-            usefulFuel: usefulFuel,
-            overdrivePressure: overdrivePressure,
-            systemicRisk: systemicRisk,
-
-            finalEnergy: finalMeanEnergy,
-            finalMomentum: finalMeanMomentum,
-
-            financialPotential: finalMeanFinancialPotential,
-            potentialGradient: potentialGradient,
-
-            localExhaustion: localExhaustion,
-            totalExhaustion: totalExhaustion,
-
-            effectiveFinancialMass: effectiveFinancialMass,
-            financialPathForce: directionalFinancialForce,
-
-            contagion: contagion,
-            nonlinearFinancialAttractor:
-                nonlinearFinancialAttractor,
-
-            cells: cells
+            1
         )
     }
 
     // ========================================================
-    // MARK: Single-Year Compatibility API
+    // MARK: - Risk Level
+    // ========================================================
+
+    func riskLevel(
+        _ risk: Double
+    ) -> String {
+
+        let bounded =
+            min(
+                max(
+                    risk,
+                    0
+                ),
+                1
+            )
+
+        switch bounded {
+
+        case ..<0.20:
+            return "LOW"
+
+        case ..<0.40:
+            return "MODERATE"
+
+        case ..<0.65:
+            return "ELEVATED"
+
+        case ..<0.80:
+            return "HIGH"
+
+        default:
+            return "CRITICAL"
+        }
+    }
+
+    // ========================================================
+    // MARK: - Full Current Analysis
     // ========================================================
 
     func analyze(
-        input: HistoricalCAInput
-    ) -> HistoricalCAResult {
+        currentYear: Int,
+        currentVolumePoints:
+            [MarketVolumePoint] = []
+    ) -> MarketRiskResult {
 
-        analyzeHistoricalSequence(
-            priorYears: [],
-            crashYear: input
+        resetCells()
+
+        let lastCrashYear =
+            crashRecords.last?.year ??
+            currentYear
+
+        let yearsSinceCrash =
+            max(
+                currentYear -
+                lastCrashYear,
+                0
+            )
+
+        let alpha =
+            estimatePowerLawAlpha()
+
+        let equilibrium =
+            powerLawPressure(
+                yearsSinceCrash:
+                    yearsSinceCrash
+            )
+
+        let volume =
+            currentVolumePoints.count >= 3
+
+            ? calculateCurrentVolumePressure(
+                points:
+                    currentVolumePoints
+            )
+
+            : calculateVolumePressure()
+
+        // ----------------------------------------------------
+        // Multiple internal generations are treated as one
+        // calendar year.
+        // ----------------------------------------------------
+
+        _ = runYear(
+            year:
+                currentYear,
+
+            equilibriumPressure:
+                equilibrium,
+
+            volumePressure:
+                volume
+        )
+
+        let localStress =
+            cellularStress()
+
+        let critical =
+            criticalCellFraction()
+
+        let crash =
+            crashCellFraction()
+
+        let risk =
+            systemicRisk(
+                equilibriumPressure:
+                    equilibrium,
+
+                volumePressure:
+                    volume
+            )
+
+        let horizon =
+            riskWindowHorizon(
+                for:
+                    risk
+            )
+
+        return MarketRiskResult(
+            currentYear:
+                currentYear,
+
+            yearsSinceCrash:
+                yearsSinceCrash,
+
+            alpha:
+                alpha,
+
+            equilibriumPressure:
+                equilibrium,
+
+            volumePressure:
+                volume,
+
+            cellularStress:
+                localStress,
+
+            criticalFraction:
+                critical,
+
+            crashFraction:
+                crash,
+
+            systemicRisk:
+                risk,
+
+            predictedWindowStart:
+                currentYear + 1,
+
+            predictedWindowEnd:
+                currentYear + horizon,
+
+            riskLevel:
+                riskLevel(risk),
+
+            yearlyRiskHistory:
+                yearlyRiskHistory
         )
     }
 
     // ========================================================
-    // MARK: Aggregate Potential Gradient
+    // MARK: - Historical Crash Analysis
     // ========================================================
-    //
-    // Averages, across the final grid, the magnitude of each
-    // cell's financial-potential difference from its
-    // neighborhood mean. This is the aggregate analogue of the
-    // per-cell `potentialGradient` computed during step().
 
-    private func aggregatePotentialGradient() -> Double {
+    func analyzeHistoricalCrash(
+        at crashIndex: Int
+    ) -> HistoricalCrashAnalysis? {
 
-        guard !cells.isEmpty else {
-            return 0.0
+        guard
+            crashRecords.indices.contains(
+                crashIndex
+            )
+        else {
+            return nil
         }
 
-        let gradients = cells.indices.map { index -> Double in
+        resetCells()
 
-            let neighborPotential = mean(
-                neighborIndices(for: index).map {
-                    cells[$0].financialPotential
+        let record =
+            crashRecords[
+                crashIndex
+            ]
+
+        // ----------------------------------------------------
+        // Determine the interval since the previous crash.
+        // ----------------------------------------------------
+
+        let intervalYears: Int
+
+        if crashIndex > 0 {
+
+            intervalYears =
+                max(
+                    record.year -
+                    crashRecords[
+                        crashIndex - 1
+                    ].year,
+                    0
+                )
+
+        } else {
+
+            intervalYears = 0
+        }
+
+        // ----------------------------------------------------
+        // Estimate the power-law parameter using only the
+        // historical crashes available through this point.
+        // ----------------------------------------------------
+
+        let alpha =
+            estimatePowerLawAlpha(
+                upThroughCrashIndex:
+                    crashIndex
+            )
+
+        // ----------------------------------------------------
+        // Build the historical interval series.
+        // ----------------------------------------------------
+
+        let intervals: [Double]
+
+        if crashIndex > 0 {
+
+            intervals =
+                (1...crashIndex)
+                .compactMap {
+                    index in
+
+                    let interval =
+                        Double(
+                            crashRecords[
+                                index
+                            ].year
+                            -
+                            crashRecords[
+                                index - 1
+                            ].year
+                        )
+
+                    return interval > 0
+                        ? interval
+                        : nil
                 }
-            )
 
-            return abs(
-                neighborPotential
-                    - cells[index].financialPotential
-            )
+        } else {
+
+            intervals = []
         }
 
-        return clamp(
-            mean(gradients)
+        // ----------------------------------------------------
+        // Historical volume pressure for this crash.
+        // ----------------------------------------------------
+
+        let volume =
+            historicalVolumePressure(
+                crashIndex:
+                    crashIndex
+            )
+
+        // ----------------------------------------------------
+        // Enhancement 5:
+        //
+        // Simulate every calendar year between crashes so
+        // systemic risk can develop progressively.
+        // ----------------------------------------------------
+
+        let startYear =
+            crashIndex > 0
+
+            ? crashRecords[
+                crashIndex - 1
+            ].year + 1
+
+            : record.year
+
+        if startYear <= record.year {
+
+            for year in
+                startYear...record.year {
+
+                let elapsed =
+                    max(
+                        year -
+                        (
+                            crashIndex > 0
+
+                            ? crashRecords[
+                                crashIndex - 1
+                            ].year
+
+                            : record.year
+                        ),
+                        0
+                    )
+
+                let yearlyEquilibrium =
+                    powerLawPressure(
+                        yearsSinceCrash:
+                            elapsed,
+
+                        alpha:
+                            alpha,
+
+                        intervals:
+                            intervals
+                    )
+
+                _ = runYear(
+                    year:
+                        year,
+
+                    equilibriumPressure:
+                        yearlyEquilibrium,
+
+                    volumePressure:
+                        volume
+                )
+            }
+        }
+
+        // ----------------------------------------------------
+        // Terminal state.
+        // ----------------------------------------------------
+
+        let localStress =
+            cellularStress()
+
+        let critical =
+            criticalCellFraction()
+
+        let crash =
+            crashCellFraction()
+
+        let terminalEquilibrium =
+            powerLawPressure(
+                yearsSinceCrash:
+                    intervalYears,
+
+                alpha:
+                    alpha,
+
+                intervals:
+                    intervals
+            )
+
+        let risk =
+            systemicRisk(
+                equilibriumPressure:
+                    terminalEquilibrium,
+
+                volumePressure:
+                    volume
+            )
+
+        let horizon =
+            riskWindowHorizon(
+                for:
+                    risk
+            )
+
+        let previousCrashYear =
+            crashIndex > 0
+
+            ? crashRecords[
+                crashIndex - 1
+            ].year
+
+            : record.year
+
+        let result =
+            MarketRiskResult(
+                currentYear:
+                    record.year,
+
+                yearsSinceCrash:
+                    intervalYears,
+
+                alpha:
+                    alpha,
+
+                equilibriumPressure:
+                    terminalEquilibrium,
+
+                volumePressure:
+                    volume,
+
+                cellularStress:
+                    localStress,
+
+                criticalFraction:
+                    critical,
+
+                crashFraction:
+                    crash,
+
+                systemicRisk:
+                    risk,
+
+                predictedWindowStart:
+                    max(
+                        previousCrashYear + 1,
+                        record.year - horizon
+                    ),
+
+                predictedWindowEnd:
+                    record.year,
+
+                riskLevel:
+                    riskLevel(risk),
+
+                yearlyRiskHistory:
+                    yearlyRiskHistory
+            )
+
+        return HistoricalCrashAnalysis(
+            year:
+                record.year,
+
+            intervalYears:
+                intervalYears,
+
+            result:
+                result,
+
+            cells:
+                cells
         )
     }
 
     // ========================================================
-    // MARK: Fraction
+    // MARK: - Risk Window
     // ========================================================
 
-    private func fraction(
-        of cells: [MarketCell],
-        where predicate: (MarketCell) -> Bool
-    ) -> Double {
+    private func riskWindowHorizon(
+        for risk: Double
+    ) -> Int {
 
-        guard !cells.isEmpty else {
-            return 0.0
+        switch risk {
+
+        case ..<0.20:
+            return 10
+
+        case ..<0.40:
+            return 7
+
+        case ..<0.65:
+            return 5
+
+        case ..<0.80:
+            return 3
+
+        default:
+            return 2
         }
-
-        let count = cells.reduce(
-            0
-        ) { partialResult, cell in
-
-            partialResult
-                + (predicate(cell) ? 1 : 0)
-        }
-
-        return Double(count)
-            / Double(cells.count)
     }
 }
