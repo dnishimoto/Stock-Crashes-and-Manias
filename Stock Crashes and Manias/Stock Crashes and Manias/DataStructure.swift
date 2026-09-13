@@ -9,6 +9,322 @@ import Foundation
 import SwiftUI
 import Combine
 
+struct HistoricalCARow: Identifiable {
+
+    let id: Int
+    let period: HistoricalCrashPeriod
+    let analysis: HistoricalAnalysis
+    let result: MarketRiskResult
+    let cells: [MarketCell]
+
+    init(
+        period: HistoricalCrashPeriod,
+        analysis: HistoricalAnalysis,
+        result: MarketRiskResult,
+        cells: [MarketCell]
+    ) {
+        self.id = period.id
+        self.period = period
+        self.analysis = analysis
+        self.result = result
+        self.cells = cells
+    }
+}
+
+enum MarketState: String, CaseIterable, Codable {
+
+    case stable
+    case rising
+    case stressed
+    case critical
+    case crashed
+
+    var displayName: String {
+        switch self {
+        case .stable:
+            return "Stable"
+        case .rising:
+            return "Rising"
+        case .stressed:
+            return "Stressed"
+        case .critical:
+            return "Critical"
+        case .crashed:
+            return "Crashed"
+        }
+    }
+}
+
+// MARK: - Historical Crash Record
+
+struct CrashRecord: Identifiable, Codable {
+
+    let id: UUID
+    let year: Int
+    let volumeMillions: Double
+
+    init(
+        id: UUID = UUID(),
+        year: Int,
+        volumeMillions: Double
+    ) {
+        self.id = id
+        self.year = year
+        self.volumeMillions = volumeMillions
+    }
+}
+
+// MARK: - Current Volume Point
+
+struct MarketVolumePoint: Identifiable {
+
+    let id = UUID()
+    let year: Int
+    let volumeMillions: Double
+
+    init(
+        year: Int,
+        volumeMillions: Double
+    ) {
+        self.year = year
+        self.volumeMillions = volumeMillions
+    }
+}
+
+// MARK: - Cellular Automaton Cell
+
+struct MarketCell: Identifiable {
+
+    let id: UUID
+
+    // ------------------------------------------------------------
+    // Core cellular state
+    // ------------------------------------------------------------
+
+    /// Accumulated market-system energy.
+    var energy: Double
+
+    /// Directional persistence of the cell's energy/stress state.
+    var momentum: Double
+
+    /// Remaining liquidity available to absorb financial stress.
+    var liquidity: Double
+
+    /// Remaining capital available to absorb financial stress.
+    var capital: Double
+
+    /// Resource exhaustion.
+    var exhaustion: Double
+
+    /// Instantaneous total cellular stress.
+    var stress: Double
+
+    // ------------------------------------------------------------
+    // Financial-gravity field
+    // ------------------------------------------------------------
+
+    /// Effective financial potential/resistance.
+    ///
+    /// Higher values represent a deeper financial-gravity state.
+    var financialPotential: Double
+
+    // ------------------------------------------------------------
+    // Local propagation
+    // ------------------------------------------------------------
+
+    /// Stress transferred from neighboring cells.
+    var contagion: Double
+
+    /// Energy/stress removed during the current transition.
+    var dissipation: Double
+
+    // ------------------------------------------------------------
+    // Discrete state
+    // ------------------------------------------------------------
+
+    var state: MarketState
+
+    init(
+        id: UUID = UUID(),
+        energy: Double = 0.50,
+        momentum: Double = 0.00,
+        liquidity: Double = 1.00,
+        capital: Double = 1.00,
+        exhaustion: Double = 0.00,
+        stress: Double = 0.00,
+        financialPotential: Double = 0.00,
+        contagion: Double = 0.00,
+        dissipation: Double = 0.00,
+        state: MarketState = .stable
+    ) {
+        self.id = id
+        self.energy = energy
+        self.momentum = momentum
+        self.liquidity = liquidity
+        self.capital = capital
+        self.exhaustion = exhaustion
+        self.stress = stress
+        self.financialPotential = financialPotential
+        self.contagion = contagion
+        self.dissipation = dissipation
+        self.state = state
+    }
+}
+
+// MARK: - Model Parameters
+
+struct MarketParameters {
+
+    // ------------------------------------------------------------
+    // Grid
+    // ------------------------------------------------------------
+
+    var gridWidth: Int = 32
+    var gridHeight: Int = 32
+
+    // ------------------------------------------------------------
+    // Initial cellular state
+    // ------------------------------------------------------------
+
+    var initialEnergy: Double = 0.50
+    var initialLiquidity: Double = 1.00
+    var initialCapital: Double = 1.00
+
+    // ------------------------------------------------------------
+    // External forcing
+    // ------------------------------------------------------------
+
+    var equilibriumWeight: Double = 0.50
+    var volumeWeight: Double = 0.50
+
+    // ------------------------------------------------------------
+    // Energy
+    // ------------------------------------------------------------
+
+    var energyInjectionRate: Double = 0.20
+    var energyConversion: Double = 0.30
+    var energyRetention: Double = 0.90
+
+    // ------------------------------------------------------------
+    // Momentum
+    // ------------------------------------------------------------
+
+    var momentumRetention: Double = 0.85
+    var momentumResponse: Double = 0.25
+
+    // ------------------------------------------------------------
+    // Financial potential
+    // ------------------------------------------------------------
+
+    var potentialGain: Double = 0.75
+    var potentialEnergyWeight: Double = 0.60
+    var potentialMomentumWeight: Double = 0.40
+
+    // ------------------------------------------------------------
+    // Resource depletion
+    // ------------------------------------------------------------
+
+    var liquidityDepletionRate: Double = 0.08
+    var capitalDepletionRate: Double = 0.06
+
+    // ------------------------------------------------------------
+    // Exhaustion
+    // ------------------------------------------------------------
+
+    var exhaustionRecoveryRate: Double = 0.02
+    var exhaustionAccumulationRate: Double = 0.35
+
+    // ------------------------------------------------------------
+    // Contagion
+    // ------------------------------------------------------------
+
+    var contagionRate: Double = 0.20
+    var diagonalNeighbors: Bool = true
+
+    // ------------------------------------------------------------
+    // Dissipation
+    // ------------------------------------------------------------
+
+    var dissipationRate: Double = 0.08
+
+    // ------------------------------------------------------------
+    // Stress weights
+    // ------------------------------------------------------------
+
+    var energyWeight: Double = 0.20
+    var momentumWeight: Double = 0.15
+    var potentialWeight: Double = 0.20
+    var exhaustionWeight: Double = 0.25
+    var contagionWeight: Double = 0.20
+
+    // ------------------------------------------------------------
+    // Noise
+    // ------------------------------------------------------------
+
+    var stochasticNoise: Double = 0.015
+
+    // ------------------------------------------------------------
+    // State thresholds
+    // ------------------------------------------------------------
+
+    var risingThreshold: Double = 0.25
+    var stressedThreshold: Double = 0.50
+    var criticalThreshold: Double = 0.75
+    var crashedThreshold: Double = 0.95
+}
+
+// MARK: - Yearly Snapshot
+
+struct YearlyRiskSnapshot: Identifiable {
+
+    let id = UUID()
+
+    let year: Int
+    let equilibriumPressure: Double
+    let volumePressure: Double
+
+    let averageEnergy: Double
+    let averageMomentum: Double
+    let averageFinancialPotential: Double
+
+    let averageLiquidity: Double
+    let averageCapital: Double
+
+    let averageExhaustion: Double
+    let averageStress: Double
+
+    let criticalFraction: Double
+    let crashFraction: Double
+    let systemicRisk: Double
+    let riskLevel: MarketState
+}
+
+// MARK: - Market Risk Result
+
+struct MarketRiskResult {
+
+    let year: Int
+
+    let equilibriumPressure: Double
+    let volumePressure: Double
+
+    let averageEnergy: Double
+    let averageMomentum: Double
+    let averageFinancialPotential: Double
+
+    let averageLiquidity: Double
+    let averageCapital: Double
+
+    let exhaustion: Double
+    let cellularStress: Double
+
+    let criticalCellFraction: Double
+    let crashCellFraction: Double
+
+    let systemicRisk: Double
+    let riskLevel: MarketState
+}
+
 struct CAParameters: Codable, Equatable {
 
     // MARK: Grid
@@ -148,80 +464,7 @@ struct CARandomGenerator {
     }
 }
 
-struct MarketVolumePoint: Identifiable, Equatable {
 
-    let id: UUID
-    let date: Date
-    let volumeMillions: Double
-
-    init(
-        id: UUID = UUID(),
-        date: Date,
-        volumeMillions: Double
-    ) {
-        self.id = id
-        self.date = date
-        self.volumeMillions = volumeMillions
-    }
-}
-
-struct MarketRiskResult: Identifiable {
-
-    let id: UUID
-
-    let currentYear: Int
-    let yearsSinceCrash: Int
-
-    let alpha: Double
-
-    let equilibriumPressure: Double
-    let volumePressure: Double
-
-    let cellularStress: Double
-    let criticalFraction: Double
-    let crashFraction: Double
-
-    let systemicRisk: Double
-
-    let predictedWindowStart: Int
-    let predictedWindowEnd: Int
-
-    let riskLevel: String
-
-    let yearlyRiskHistory: [YearlyRiskSnapshot]
-
-    init(
-        id: UUID = UUID(),
-        currentYear: Int,
-        yearsSinceCrash: Int,
-        alpha: Double,
-        equilibriumPressure: Double,
-        volumePressure: Double,
-        cellularStress: Double,
-        criticalFraction: Double,
-        crashFraction: Double,
-        systemicRisk: Double,
-        predictedWindowStart: Int,
-        predictedWindowEnd: Int,
-        riskLevel: String,
-        yearlyRiskHistory: [YearlyRiskSnapshot]
-    ) {
-        self.id = id
-        self.currentYear = currentYear
-        self.yearsSinceCrash = yearsSinceCrash
-        self.alpha = alpha
-        self.equilibriumPressure = equilibriumPressure
-        self.volumePressure = volumePressure
-        self.cellularStress = cellularStress
-        self.criticalFraction = criticalFraction
-        self.crashFraction = crashFraction
-        self.systemicRisk = systemicRisk
-        self.predictedWindowStart = predictedWindowStart
-        self.predictedWindowEnd = predictedWindowEnd
-        self.riskLevel = riskLevel
-        self.yearlyRiskHistory = yearlyRiskHistory
-    }
-}
 
 struct HistoricalCrashAnalysis: Identifiable{
 
@@ -248,51 +491,6 @@ struct HistoricalCrashAnalysis: Identifiable{
         self.cells = cells
     }
 }
-struct YearlyRiskSnapshot: Identifiable {
-    
-    let id: UUID
-    let year: Int
-    let generationCount: Int
-    
-    let equilibriumPressure: Double
-    let volumePressure: Double
-    
-    let cellularStress: Double
-    let criticalFraction: Double
-    let crashFraction: Double
-    
-    let systemicRisk: Double
-    let riskLevel: String
-    
-    let cells: [MarketCell]
-    
-    init(
-        id: UUID = UUID(),
-        year: Int,
-        generationCount: Int,
-        equilibriumPressure: Double,
-        volumePressure: Double,
-        cellularStress: Double,
-        criticalFraction: Double,
-        crashFraction: Double,
-        systemicRisk: Double,
-        riskLevel: String,
-        cells: [MarketCell]
-    ) {
-        self.id = id
-        self.year = year
-        self.generationCount = generationCount
-        self.equilibriumPressure = equilibriumPressure
-        self.volumePressure = volumePressure
-        self.cellularStress = cellularStress
-        self.criticalFraction = criticalFraction
-        self.crashFraction = crashFraction
-        self.systemicRisk = systemicRisk
-        self.riskLevel = riskLevel
-        self.cells = cells
-    }
-}
-
 enum MarketCellState: String {
     
     case stable
@@ -317,69 +515,6 @@ enum MarketCellState: String {
     }
 }
 
-struct CrashRecord: Identifiable, Equatable, Codable {
-    let id: UUID
-    let year: Int
-    let volumeMillions: Double
-
-    init(
-        id: UUID = UUID(),
-        year: Int,
-        volumeMillions: Double
-    ) {
-        self.id = id
-        self.year = year
-        self.volumeMillions = volumeMillions
-    }
-}
-
-struct MarketCell: Identifiable {
-
-    let id: UUID
-
-    var energy: Double
-    var momentum: Double
-    var exhaustion: Double
-    var stress: Double
-
-    // Financial-gravity field.
-    //
-    // Higher values represent a deeper effective financial
-    // potential/resistance state.
-    var financialPotential: Double
-
-    var state: MarketState
-
-    init(
-        id: UUID = UUID(),
-        energy: Double = 0.50,
-        momentum: Double = 0.00,
-        exhaustion: Double = 0.00,
-        stress: Double = 0.00,
-        financialPotential: Double = 0.00,
-        state: MarketState = .stable
-    ) {
-        self.id = id
-        self.energy = energy
-        self.momentum = momentum
-        self.exhaustion = exhaustion
-        self.stress = stress
-        self.financialPotential = financialPotential
-        self.state = state
-    }
-}
-
-// ============================================================
-// MARK: - Market State
-// ============================================================
-
-enum MarketState: String {
-    case stable
-    case rising
-    case stressed
-    case critical
-    case crashed
-}
 
 // ============================================================
 // MARK: - Historical Input
