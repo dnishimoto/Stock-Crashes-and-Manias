@@ -40,8 +40,7 @@ struct ContentView: View {
     // MARK: Canonical Results
     // ========================================================
 
-    @State private var result = ContentView.defaultResult()
-
+ 
     @State private var historicalAnalyses: [HistoricalAnalysis] = []
 
     // One canonical CA engine.
@@ -49,33 +48,7 @@ struct ContentView: View {
 
     private let historicalEngine = HistoricalMarketEngine()
 
-    // ========================================================
-    // MARK: Historical CA Rows
-    // ========================================================
-
-    private var historicalCARows: [HistoricalCARow] {
-
-        historicalEngine.periods.compactMap { period in
-
-            let result = historicalEngine.caAnalysis(
-                for: period,
-                using: engine
-            )
-
-            let analysis = historicalEngine.analysis(
-                for: period
-            )
-
-            let cells = engine.cells
-
-            return HistoricalCARow(
-                period: period,
-                analysis: analysis,
-                result: result,
-                cells: cells
-            )
-        }
-    }
+    
 
     // ========================================================
     // MARK: Body
@@ -98,8 +71,6 @@ struct ContentView: View {
 
                     currentScenarioSection
 
-                    historicalSection
-
                     historicalMatrixCard
 
                     modelSummaryCard
@@ -109,69 +80,16 @@ struct ContentView: View {
             .navigationTitle(
                 "Stock Crashes and Manias"
             )
-            .toolbar {
-
-                ToolbarItem(
-                    placement: .topBarTrailing
-                ) {
-
-                    Button {
-                        runSimulation()
-                    } label: {
-
-                        Image(
-                            systemName:
-                                "arrow.clockwise"
-                        )
-                    }
-                }
-            }
+       
             .onAppear {
 
                 loadHistoricalMatrix()
 
-                runSimulation()
             }
         }
     }
 
-    // ========================================================
-    // MARK: Historical Section
-    // ========================================================
-
-    private var historicalSection: some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 16
-        ) {
-
-            Text(
-                "Historical Crash-Year Analysis with Current Scenario Parameters"
-            )
-            .font(.title2.bold())
-
-            Text(
-                """
-                Each historical crash year is evaluated using the current
-                scenario inputs except that the year is replaced by the
-                historical crash year. The cellular automaton is evaluated
-                from the historical context selected by the engine.
-                """
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-
-            ForEach(historicalCARows) { row in
-
-                historicalCrashPanel(
-                    analysis: row.analysis,
-                    result: row.result,
-                    cells: row.cells
-                )
-            }
-        }
-    }
+   
 
     // ========================================================
     // MARK: Historical Crash Panel
@@ -297,14 +215,6 @@ struct ContentView: View {
 
             HStack {
 
-                metric(
-                    title: "Cellular Stress",
-                    value:
-                        percent(
-                            result.cellularStress
-                        )
-                )
-
               
                 metric(
                     title: "Risk",
@@ -411,20 +321,6 @@ struct ContentView: View {
                         result.systemicRisk
                     )
             )
-
-            HStack {
-
-                metric(
-                    title: "Cellular Stress",
-                    value:
-                        percent(
-                            result.cellularStress
-                        )
-                )
-
-
-              
-            }
 
 
             Text(
@@ -639,22 +535,7 @@ struct ContentView: View {
                 suffix: "%"
             )
 
-            Button {
-
-                runSimulation()
-
-            } label: {
-
-                Text(
-                    "Run Simulation"
-                )
-                .frame(
-                    maxWidth: .infinity
-                )
-            }
-            .buttonStyle(
-                .borderedProminent
-            )
+          
         }
         .padding()
         .background(
@@ -708,89 +589,12 @@ struct ContentView: View {
             )
             .font(.title3.bold())
 
-            equilibriumCard
-
             cellularAutomatonCard
 
-            riskCard
         }
     }
 
-    // ========================================================
-    // MARK: Current Equilibrium
-    // ========================================================
-
-    private var equilibriumCard: some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 12
-        ) {
-
-            Text(
-                "Equilibrium Turn in Momentum"
-            )
-            .font(.headline)
-
-            HStack {
-
-                metric(
-                    title: "Equilibrium",
-                    value:
-                        percent(
-                            result.equilibriumPressure
-                        )
-                )
-
-                metric(
-                    title: "Volume Pressure",
-                    value:
-                        percent(
-                            result.volumePressure
-                        )
-                )
-            }
-
-            Text(
-                "Equilibrium is the model's estimate of the point where "
-                + "market expansion begins losing momentum. Volume pressure "
-                + "reflects trading-volume expansion feeding into the "
-                + "cellular automaton alongside it."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-
-            HStack {
-
-                Text(
-                    "Current equilibrium"
-                )
-
-                Spacer()
-
-                Text(
-                    percent(
-                        result.equilibriumPressure
-                    )
-                )
-                .font(.title.bold())
-            }
-
-            ProgressView(
-                value:
-                    bounded(
-                        result.equilibriumPressure
-                    )
-            )
-        }
-        .padding()
-        .background(
-            .thinMaterial,
-            in: RoundedRectangle(
-                cornerRadius: 16
-            )
-        )
-    }
+  
 
     // ========================================================
     // MARK: Current Cellular Automaton
@@ -906,63 +710,8 @@ struct ContentView: View {
         .font(.caption2)
     }
 
-    // ========================================================
-    // MARK: Current Risk
-    // ========================================================
-
-    private var riskCard: some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 10
-        ) {
-
-            Text(
-                "Systemic Risk"
-            )
-            .font(.headline)
-
-            riskHeader(
-                result: result
-            )
-
-            ProgressView(
-                value:
-                    bounded(
-                        result.systemicRisk
-                    )
-            )
-
-            HStack {
-
-                metric(
-                    title: "Cellular Stress",
-                    value:
-                        percent(
-                            result.cellularStress
-                        )
-                )
-
-               
-            }
-
-
-            Text(
-                "Exploratory cellular-automaton signal. "
-                + "It is not a probability that a crash will occur."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-        .padding()
-        .background(
-            .thinMaterial,
-            in: RoundedRectangle(
-                cornerRadius: 16
-            )
-        )
-    }
-
+   
+ 
     // ========================================================
     // MARK: Risk Header
     // ========================================================
@@ -1403,18 +1152,8 @@ struct ContentView: View {
         )
     }
 
-    // ========================================================
-    // MARK: Run Simulation
-    // ========================================================
-
-    private func runSimulation() {
-
-        result =
-            engine.analyze(
-                currentYear:
-                    selectedYear
-            )
-    }
+  
+  
 
     // ========================================================
     // MARK: Historical Matrix
@@ -1431,18 +1170,7 @@ struct ContentView: View {
             }
     }
 
-    // ========================================================
-    // MARK: Default Result
-    // ========================================================
-
-    private static func defaultResult()
-        -> MarketRiskResult
-    {
-
-        MarketExhaustionEngine().analyze(
-            currentYear: 2026
-        )
-    }
+ 
 }
 
 // ============================================================

@@ -152,74 +152,93 @@ final class HistoricalMarketEngine {
         for period: HistoricalCrashPeriod
     ) -> HistoricalAnalysis {
 
-        let years =
+        // ----------------------------------------------------
+        // Sorted historical rows
+        // ----------------------------------------------------
+
+        let historicalYears =
             period.priorYears.sorted {
                 $0.year < $1.year
             }
 
+        // The model stores only the year numbers in
+        // HistoricalAnalysis.priorYearsUsed.
+        //let priorYearNumbers: [Int] = historicalYears
+
+
+        // ----------------------------------------------------
+        // Historical averages
+        // ----------------------------------------------------
+
         let m2Growth =
             average(
-                years.map {
+                historicalYears.map {
                     $0.m2GrowthPercent
                 }
             )
 
         let moneyPolicyChangeImpact =
             average(
-                period.priorYears.compactMap {
+                historicalYears.compactMap {
                     $0.moneyPolicyChangeImpact
                 }
             )
 
         let bankingCreditStressRating =
             average(
-                period.priorYears.compactMap {
+                historicalYears.compactMap {
                     $0.bankingCreditStressRating
                 }
             )
 
         let inflation =
             average(
-                years.map {
+                historicalYears.map {
                     $0.inflationPercent
                 }
             )
 
         let bondYield =
             average(
-                years.map {
+                historicalYears.map {
                     $0.bondYieldAvgPercent
                 }
             )
 
         let taxGrowth =
             average(
-                years.map {
+                historicalYears.map {
                     $0.taxGrowthPercent
                 }
             )
 
         let economicGrowth =
             average(
-                years.map {
+                historicalYears.map {
                     $0.economicGrowthPercent
                 }
             )
 
         let stockGrowth =
             average(
-                years.map {
+                historicalYears.map {
                     $0.stockGrowthPercent
                 }
             )
 
+        // volumeGrowth() expects [Int].
         let stockVolumeGrowth =
-            volumeGrowth(years)
+            volumeGrowth(
+                historicalYears
+            )
 
+        // crashInterval() currently returns a numeric value that
+        // must be stored as Int in HistoricalAnalysis.
         let interval =
-            crashInterval(
-                for:
-                    period.crashYear
+            Int(
+                crashInterval(
+                    for: period.crashYear
+                )
             )
 
         // ----------------------------------------------------
@@ -287,13 +306,13 @@ final class HistoricalMarketEngine {
         // ----------------------------------------------------
         // Momentum Turn
         //
-        // Higher value means stronger evidence that the
-        // expansion is losing acceleration.
+        // Higher value means stronger evidence that expansion
+        // is losing acceleration.
         // ----------------------------------------------------
 
         let momentumTurn =
             clamp(
-                1 -
+                1.0 -
                 momentum +
                 0.50 * inflationSignal +
                 0.25 * bondSignal
@@ -302,12 +321,17 @@ final class HistoricalMarketEngine {
         // ----------------------------------------------------
         // Equilibrium
         //
-        // The central historical measure.
-        //
         // Money + stock activity establish the expansion.
-        // The equilibrium appears when marginal momentum
-        // begins to weaken under increasing pressure.
+        // Equilibrium increases as marginal momentum weakens
+        // under increasing pressure.
         // ----------------------------------------------------
+
+        let cycleIntervalSignal =
+            normalize(
+                Double(interval),
+                lower: 0,
+                upper: 25
+            )
 
         let equilibrium =
             clamp(
@@ -315,37 +339,23 @@ final class HistoricalMarketEngine {
                 0.25 * inflationSignal +
                 0.15 * bondSignal +
                 0.10 * volumeSignal +
-                0.05 *
-                normalize(
-                    interval,
-                    lower: 0,
-                    upper: 25
-                )
+                0.05 * cycleIntervalSignal
             )
 
         // ----------------------------------------------------
-        // Power Law
+        // Power-law / cycle-pressure term
         //
-        // Inputs:
-        //     x = optimism
-        //     y = equilibrium
-        //
-        // Interval is included only as a weak cycle term.
-        //
-        // This is deliberately bounded so a missing or zero
-        // historical value does not create NaN/Infinity.
+        // This is a model-defined nonlinear pressure term.
+        // It is not an empirical claim that the historical
+        // crashes follow a measured power law.
         // ----------------------------------------------------
 
         let cycleTerm =
-            normalize(
-                interval,
-                lower: 0,
-                upper: 25
-            )
+            cycleIntervalSignal
 
         let base =
             max(
-                0,
+                0.0,
                 optimism
             )
 
@@ -365,12 +375,17 @@ final class HistoricalMarketEngine {
                 )
             )
 
+        let  priorYearsUsed = historicalYears.map(\.year)
+        // ----------------------------------------------------
+        // HistoricalAnalysis
+        // ----------------------------------------------------
+
         return HistoricalAnalysis(
             crashYear:
                 period.crashYear,
 
             priorYearsUsed:
-                years.count,
+                priorYearsUsed,
 
             m2Growth:
                 m2Growth,
@@ -414,269 +429,18 @@ final class HistoricalMarketEngine {
             powerLaw:
                 powerLaw,
 
+            // Cellular risk is calculated by the CA pipeline,
+            // not by this historical-input analysis.
             cellularRisk:
-                0,
+                0.0,
 
             bankingCreditStressRating:
                 bankingCreditStressRating
         )
     }
 
-    // --------------------------------------------------------
-    // MARK: Cellular Automaton Analysis — Historical
-    // --------------------------------------------------------
-    //
-    // HistoricalMarketEngine supplies the historical inputs.
-    //
-    // MarketExhaustionEngine performs the actual cellular
-    // automaton calculation.
-    //
-    // This keeps one canonical CA implementation rather than
-    // maintaining a second historical CA pipeline here.
-    // --------------------------------------------------------
-
-    func caAnalysis(
-        for period: HistoricalCrashPeriod,
-        using engine: MarketExhaustionEngine
-    ) -> MarketRiskResult {
-
-        let years =
-            period.priorYears.sorted {
-                $0.year < $1.year
-            }
-
-        // --------------------------------------------------------
-        // Historical macroeconomic inputs
-        // --------------------------------------------------------
-
-        let growthM2 =
-            average(
-                years.map {
-                    $0.m2GrowthPercent
-                }
-            )
-
-        let inflationPercent =
-            average(
-                years.map {
-                    $0.inflationPercent
-                }
-            )
-
-        let taxGrowthPercent =
-            average(
-                years.map {
-                    $0.taxGrowthPercent
-                }
-            )
-
-        let economicGrowthPercent =
-            average(
-                years.map {
-                    $0.economicGrowthPercent
-                }
-            )
-
-        let bondYieldAvgPercent =
-            average(
-                years.map {
-                    $0.bondYieldAvgPercent
-                }
-            )
-
-        let growthVolumePercent =
-            volumeGrowth(years)
-
-        let interval =
-            crashInterval(
-                for:
-                    period.crashYear
-            )
-
-        // --------------------------------------------------------
-        // Stock-growth slowdown
-        // --------------------------------------------------------
-
-        let stockGrowthPercent =
-            years.last?.stockGrowthPercent ?? 0
-
-        let previousStockGrowthPercent =
-            years.count >= 2
-            ? (
-                years[years.count - 2].stockGrowthPercent
-                ?? stockGrowthPercent
-            )
-            : stockGrowthPercent
-
-        // --------------------------------------------------------
-        // Policy and credit stress
-        // --------------------------------------------------------
-
-        let moneyPolicyChangeImpact =
-            average(
-                period.priorYears.compactMap {
-                    $0.moneyPolicyChangeImpact
-                }
-            )
-
-        let bankingCreditStressRating =
-            average(
-                years.map {
-                    $0.bankingCreditStressRating
-                }
-            )
-
-        // --------------------------------------------------------
-        // Calculate the historical analysis values.
-        //
-        // These are retained here because the existing
-        // MarketExhaustionEngine API accepts currentYear rather
-        // than HistoricalCAInput.
-        // --------------------------------------------------------
-
-        let moneySignal =
-            normalize(
-                growthM2,
-                lower: -5,
-                upper: 20
-            )
-
-        let stockSignal =
-            normalize(
-                stockGrowthPercent,
-                lower: -50,
-                upper: 100
-            )
-
-        let previousStockSignal =
-            normalize(
-                previousStockGrowthPercent,
-                lower: -50,
-                upper: 100
-            )
-
-        let volumeSignal =
-            normalize(
-                growthVolumePercent,
-                lower: -50,
-                upper: 300
-            )
-
-        let inflationSignal =
-            normalize(
-                inflationPercent,
-                lower: 0,
-                upper: 15
-            )
-
-        let bondSignal =
-            normalize(
-                bondYieldAvgPercent,
-                lower: 0,
-                upper: 15
-            )
-
-        let taxSignal =
-            normalize(
-                taxGrowthPercent,
-                lower: -10,
-                upper: 20
-            )
-
-        let economicSignal =
-            normalize(
-                economicGrowthPercent,
-                lower: -10,
-                upper: 15
-            )
-
-        let policySignal =
-            clamp(
-                moneyPolicyChangeImpact
-            )
-
-        let creditSignal =
-            clamp(
-                bankingCreditStressRating
-            )
-
-        // --------------------------------------------------------
-        // Historical pressure
-        // --------------------------------------------------------
-
-        let optimism =
-            clamp(
-                0.35 * moneySignal +
-                0.30 * stockSignal +
-                0.15 * volumeSignal +
-                0.10 * economicSignal +
-                0.10 * taxSignal
-            )
-
-        let momentum =
-            clamp(
-                0.45 * moneySignal +
-                0.35 * stockSignal +
-                0.20 * volumeSignal
-            )
-
-        let momentumTurn =
-            clamp(
-                1.0 -
-                (
-                    0.60 * momentum +
-                    0.40 * previousStockSignal
-                ) +
-                0.45 * inflationSignal +
-                0.25 * bondSignal
-            )
-
-        let cyclePressure =
-            normalize(
-                interval,
-                lower: 0,
-                upper: 25
-            )
-
-        let historicalPressure =
-            clamp(
-                0.35 * momentumTurn +
-                0.20 * inflationSignal +
-                0.10 * bondSignal +
-                0.10 * volumeSignal +
-                0.10 * policySignal +
-                0.10 * creditSignal +
-                0.05 * cyclePressure
-            )
-
-        // --------------------------------------------------------
-        // Historical year becomes the CA analysis year.
-        //
-        // The existing engine's public API accepts currentYear.
-        // --------------------------------------------------------
-
-        let result =
-            engine.analyze(
-                currentYear:
-                    period.crashYear
-            )
-
-        // --------------------------------------------------------
-        // Keep the canonical CA result from the engine.
-        //
-        // Historical calculations above remain available to the
-        // HistoricalMarketEngine without changing MarketRiskResult.
-        //
-        // IMPORTANT:
-        // Do not manufacture a second MarketRiskResult here.
-        // --------------------------------------------------------
-
-        _ = optimism
-        _ = historicalPressure
-
-        return result
-    }
-
+   
+  
 
     // --------------------------------------------------------
     // MARK: Normalization

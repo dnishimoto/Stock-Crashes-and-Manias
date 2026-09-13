@@ -10,164 +10,63 @@ import SwiftUI
 import Combine
 
 // ============================================================
-// MARK: - Canonical Market Scenario
+// MARK: - Market Exhaustion Engine
 // ============================================================
 //
-// This is the single input object passed into the cellular
-// automaton.
+// Architecture:
 //
-// Raw historical observations are converted into this structure
-// before entering the CA.
+// HistoricalYear
+//      ↓
+// MarketScenario
+//      ↓
+// MarketExhaustionEngine
+//      ↓
+// stepCA()
+//      ↓
+// MarketCell[]
+//      ↓
+// MarketRiskResult
 //
-// The CA should never need to know where the values came from.
+// MarketParameters is the ONLY coefficient/parameter system.
 //
-
-struct MarketScenario: Equatable {
-
-    var moneySupplyChangePercent: Double = 0.0
-    var inflationPercent: Double = 0.0
-    var taxationPercent: Double = 0.0
-    var economicGrowthPercent: Double = 0.0
-    var stockGrowthPercent: Double = 0.0
-    var previousStockGrowthPercent: Double = 0.0
-    var bondYieldAvgPercent: Double = 0.0
-    var bankingCreditStressRating: Double = 0.0
-    var moneyPolicyChangeImpact: Double = 0.0
-
-    /// Deliberately interpreted as magnitude by the CA.
-    var externalShockMagnitudePercent: Double = 0.0
-
-    init(
-        moneySupplyChangePercent: Double = 0.0,
-        inflationPercent: Double = 0.0,
-        taxationPercent: Double = 0.0,
-        economicGrowthPercent: Double = 0.0,
-        stockGrowthPercent: Double = 0.0,
-        previousStockGrowthPercent: Double = 0.0,
-        bondYieldAvgPercent: Double = 0.0,
-        bankingCreditStressRating: Double = 0.0,
-        moneyPolicyChangeImpact: Double = 0.0,
-        externalShockMagnitudePercent: Double = 0.0
-    ) {
-        self.moneySupplyChangePercent = moneySupplyChangePercent
-        self.inflationPercent = inflationPercent
-        self.taxationPercent = taxationPercent
-        self.economicGrowthPercent = economicGrowthPercent
-        self.stockGrowthPercent = stockGrowthPercent
-        self.previousStockGrowthPercent = previousStockGrowthPercent
-        self.bondYieldAvgPercent = bondYieldAvgPercent
-        self.bankingCreditStressRating = bankingCreditStressRating
-        self.moneyPolicyChangeImpact = moneyPolicyChangeImpact
-        self.externalShockMagnitudePercent = externalShockMagnitudePercent
-    }
-}
-
-// ============================================================
-// MARK: - Engine
+// MarketScenario is historical/macro INPUT DATA.
+// It is not a second parameter system.
+//
+// The cellular automaton is synchronous:
+// all neighbor reads come from previousCells and all writes
+// go into nextCells.
+//
+// One generation currently represents one simulated year
+// because generationsPerYear defaults to 1.
 // ============================================================
 
 @MainActor
 final class MarketExhaustionEngine: ObservableObject {
 
-    // --------------------------------------------------------
-    // Historical crash records
-    // --------------------------------------------------------
+    // ========================================================
+    // MARK: - Published Simulation State
+    // ========================================================
 
-    private(set) var crashRecords: [CrashRecord] = [
+    @Published private(set) var cells: [MarketCell] = []
 
-        CrashRecord(
-            year: 1907,
-            volumeMillions: 210.0
-        ),
+    @Published private(set) var yearlyRiskHistory:
+        [YearlyRiskSnapshot] = []
 
-        CrashRecord(
-            year: 1929,
-            volumeMillions: 600.0
-        ),
+    @Published private(set) var historicalFrames:
+        [HistoricalCAFrame] = []
 
-        CrashRecord(
-            year: 1937,
-            volumeMillions: 500.0
-        ),
+    @Published private(set) var historicalAnalyses:
+        [HistoricalCrashAnalysis] = []
 
-        CrashRecord(
-            year: 1962,
-            volumeMillions: 900.0
-        ),
+    // ========================================================
+    // MARK: - Canonical Configuration
+    // ========================================================
 
-        CrashRecord(
-            year: 1970,
-            volumeMillions: 1100.0
-        ),
+    private(set) var parameters: MarketParameters
 
-        CrashRecord(
-            year: 1973,
-            volumeMillions: 1400.0
-        ),
-
-        CrashRecord(
-            year: 1974,
-            volumeMillions: 1500.0
-        ),
-
-        CrashRecord(
-            year: 1987,
-            volumeMillions: 3000.0
-        ),
-
-        CrashRecord(
-            year: 1990,
-            volumeMillions: 3200.0
-        ),
-
-        CrashRecord(
-            year: 2000,
-            volumeMillions: 5000.0
-        ),
-
-        CrashRecord(
-            year: 2008,
-            volumeMillions: 7000.0
-        ),
-
-        CrashRecord(
-            year: 2020,
-            volumeMillions: 9000.0
-        ),
-
-        CrashRecord(
-            year: 2022,
-            volumeMillions: 10000.0
-        )
-    ]
-
-    // --------------------------------------------------------
-    // Simulation
-    // --------------------------------------------------------
-
-    private(set) var cells: [MarketCell] = []
-
-    let gridWidth: Int
-    let gridHeight: Int
-
-    var parameters: MarketParameters
-
-    private(set) var yearlyRiskHistory: [YearlyRiskSnapshot] = []
-
-    // --------------------------------------------------------
-    // Random source
-    // --------------------------------------------------------
-
-    private let randomSeed: UInt64
     private var random: SplitMix64
 
-    // --------------------------------------------------------
-    // Historical macro data
-    // --------------------------------------------------------
-
-    private lazy var historicalYears: [HistoricalYear] = {
-        loadHistoricalYears()
-    }()
+    private let historicalData: HistoricalJSONRoot
 
     // ========================================================
     // MARK: - Initialization
@@ -175,30 +74,2721 @@ final class MarketExhaustionEngine: ObservableObject {
 
     init(
         parameters: MarketParameters = MarketParameters(),
-        seed: UInt64 = 42
+        historicalJSON: String = historicalMarketJSON
     ) {
         self.parameters = parameters
-
-        self.gridWidth = max(
-            parameters.gridWidth,
-            1
-        )
-
-        self.gridHeight = max(
-            parameters.gridHeight,
-            1
-        )
-
-        self.randomSeed = seed
         self.random = SplitMix64(
-            seed: seed
+            seed: parameters.randomSeed
+        )
+
+        self.historicalData =
+            Self.decodeHistoricalData(
+                historicalJSON
+            )
+
+        resetCells()
+    }
+
+    // ========================================================
+    // MARK: - Parameter Updates
+    // ========================================================
+
+    func updateParameters(
+        _ newParameters: MarketParameters
+    ) {
+        parameters = newParameters
+
+        random = SplitMix64(
+            seed: parameters.randomSeed
         )
 
         resetCells()
     }
 
     // ========================================================
-    // MARK: - Numeric Helpers
+    // MARK: - Reset
+    // ========================================================
+
+    func resetCells() {
+
+        random = SplitMix64(
+            seed: parameters.randomSeed
+        )
+
+        yearlyRiskHistory.removeAll(
+            keepingCapacity: true
+        )
+
+        historicalFrames.removeAll(
+            keepingCapacity: true
+        )
+
+        historicalAnalyses.removeAll(
+            keepingCapacity: true
+        )
+
+        let width = max(
+            parameters.gridWidth,
+            1
+        )
+
+        let height = max(
+            parameters.gridHeight,
+            1
+        )
+
+        let count = width * height
+
+        cells = (0..<count).map { id in
+
+            let variation =
+                random.centeredUnit() * 0.04
+
+            let energy =
+                bounded(
+                    parameters.initialEnergy + variation
+                )
+
+            let liquidity =
+                bounded(
+                    parameters.initialLiquidity
+                )
+
+            let capital =
+                bounded(
+                    parameters.initialCapital
+                )
+
+            return MarketCell(
+                id: id,
+                energy: energy,
+                liquidity: liquidity,
+                capital: capital,
+                momentum: 0.0,
+                financialPotential: 0.0,
+                potentialGradient: 0.0,
+                exhaustion: 0.0,
+                contagion: 0.0,
+                stress: 0.0,
+                state: .stable
+            )
+        }
+    }
+
+    // ========================================================
+    // MARK: - Public Simulation
+    // ========================================================
+
+    /// Runs the CA for the requested number of years.
+    ///
+    /// One generation represents one year according to
+    /// generationsPerYear.
+    @discardableResult
+    func run(
+        years: Int,
+        equilibriumPressure: Double,
+        volumePressure: Double,
+        scenario: MarketScenario = .neutral
+    ) -> MarketRiskResult {
+
+        guard years > 0 else {
+            return makeRiskResult(
+                year: 0,
+                equilibriumPressure:
+                    equilibriumPressure,
+                volumePressure:
+                    volumePressure
+            )
+        }
+
+        var result =
+            makeRiskResult(
+                year: 0,
+                equilibriumPressure:
+                    equilibriumPressure,
+                volumePressure:
+                    volumePressure
+            )
+
+        let generationsPerYear =
+            max(
+                parameters.generationsPerYear,
+                1
+            )
+
+        for year in 1...years {
+
+            for _ in 0..<generationsPerYear {
+                stepCA(
+                    equilibriumPressure:
+                        equilibriumPressure,
+                    volumePressure:
+                        volumePressure,
+                    scenario: scenario
+                )
+            }
+
+            result = makeRiskResult(
+                year: year,
+                equilibriumPressure:
+                    equilibriumPressure,
+                volumePressure:
+                    volumePressure
+            )
+
+            yearlyRiskHistory.append(
+                YearlyRiskSnapshot(
+                    year: year,
+                    equilibriumPressure:
+                        result.equilibriumPressure,
+                    volumePressure:
+                        result.volumePressure,
+                    systemicRisk:
+                        result.systemicRisk,
+                    meanEnergy:
+                        result.meanEnergy,
+                    meanMomentum:
+                        result.meanMomentum,
+                    meanExhaustion:
+                        result.meanExhaustion,
+                    meanStress:
+                        result.meanStress,
+                    meanFinancialPotential:
+                        result.meanFinancialPotential,
+                    criticalFraction:
+                        result.criticalFraction,
+                    crashFraction:
+                        result.crashFraction
+                )
+            )
+        }
+
+        return result
+    }
+
+    /// Runs exactly one simulated year.
+    @discardableResult
+    func runYear(
+        year: Int,
+        equilibriumPressure: Double,
+        volumePressure: Double,
+        scenario: MarketScenario = .neutral
+    ) -> MarketRiskResult {
+
+        let generations =
+            max(
+                parameters.generationsPerYear,
+                1
+            )
+
+        for _ in 0..<generations {
+
+            stepCA(
+                equilibriumPressure:
+                    equilibriumPressure,
+                volumePressure:
+                    volumePressure,
+                scenario: scenario
+            )
+        }
+
+        let result = makeRiskResult(
+            year: year,
+            equilibriumPressure:
+                equilibriumPressure,
+            volumePressure:
+                volumePressure
+        )
+
+        yearlyRiskHistory.append(
+            YearlyRiskSnapshot(
+                year: year,
+                equilibriumPressure:
+                    result.equilibriumPressure,
+                volumePressure:
+                    result.volumePressure,
+                systemicRisk:
+                    result.systemicRisk,
+                meanEnergy:
+                    result.meanEnergy,
+                meanMomentum:
+                    result.meanMomentum,
+                meanExhaustion:
+                    result.meanExhaustion,
+                meanStress:
+                    result.meanStress,
+                meanFinancialPotential:
+                    result.meanFinancialPotential,
+                criticalFraction:
+                    result.criticalFraction,
+                crashFraction:
+                    result.crashFraction
+            )
+        )
+
+        return result
+    }
+
+    // ========================================================
+    // MARK: - Core Cellular Automaton
+    // ========================================================
+
+    private func stepCA(
+        equilibriumPressure: Double,
+        volumePressure: Double,
+        scenario: MarketScenario
+    ) {
+
+        guard !cells.isEmpty else {
+            return
+        }
+
+        // ----------------------------------------------------
+        // Normalize historical/macro inputs.
+        // ----------------------------------------------------
+
+        let normalizedMoneySupply =
+            bounded(
+                scenario.moneySupplyChangePercent / 20.0,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        let normalizedInflation =
+            bounded(
+                scenario.inflationPercent / 15.0
+            )
+
+        let normalizedTaxGrowth =
+            bounded(
+                scenario.taxationGrowthPercent / 15.0,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        let normalizedEconomicGrowth =
+            bounded(
+                scenario.economicGrowthPercent / 20.0,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        let normalizedStockGrowth =
+            bounded(
+                scenario.stockGrowthPercent / 60.0,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        let normalizedPreviousStockGrowth =
+            bounded(
+                scenario.previousStockGrowthPercent / 60.0,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        let normalizedBondYield =
+            bounded(
+                scenario.bondYieldAvgPercent / 15.0
+            )
+
+        let normalizedBankingStress =
+            bounded(
+                scenario.bankingCreditStressRating / 10.0
+            )
+
+        let normalizedPolicy =
+            bounded(
+                scenario.moneyPolicyChangeImpact / 10.0,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        let normalizedShock =
+            bounded(
+                abs(
+                    scenario.externalShockMagnitudePercent
+                ) / 20.0
+            )
+
+        // ----------------------------------------------------
+        // External forcing.
+        // ----------------------------------------------------
+
+        let equilibrium =
+            bounded(
+                equilibriumPressure
+            )
+
+        let volume =
+            bounded(
+                volumePressure
+            )
+
+        let externalForcing =
+            bounded(
+                parameters.equilibriumWeight * equilibrium
+                +
+                parameters.volumeWeight * volume
+            )
+
+        // ----------------------------------------------------
+        // Expansionary macro forcing.
+        // ----------------------------------------------------
+
+        let positiveMoney =
+            max(
+                normalizedMoneySupply,
+                0.0
+            )
+
+        let positiveEconomicGrowth =
+            max(
+                normalizedEconomicGrowth,
+                0.0
+            )
+
+        let positiveStockGrowth =
+            max(
+                normalizedStockGrowth,
+                0.0
+            )
+
+        let positivePolicy =
+            max(
+                normalizedPolicy,
+                0.0
+            )
+
+        let expansionaryEnergy =
+            positiveMoney
+            * parameters.moneySupplyEnergyWeight
+            +
+            positiveEconomicGrowth
+            * parameters.economicGrowthEnergyWeight
+            +
+            positiveStockGrowth
+            * parameters.economicGrowthEnergyWeight
+            +
+            positivePolicy
+            * parameters.moneySupplyEnergyWeight
+
+        // ----------------------------------------------------
+        // Contractionary macro forcing.
+        // ----------------------------------------------------
+
+        let negativeMoney =
+            max(
+                -normalizedMoneySupply,
+                0.0
+            )
+
+        let negativeEconomicGrowth =
+            max(
+                -normalizedEconomicGrowth,
+                0.0
+            )
+
+        let positiveTaxPressure =
+            max(
+                normalizedTaxGrowth,
+                0.0
+            )
+
+        let contractionaryEnergy =
+            negativeMoney
+            * parameters.moneySupplyEnergyWeight
+            +
+            normalizedInflation
+            * parameters.economicGrowthEnergyWeight
+            +
+            positiveTaxPressure
+            * parameters.taxLiquidityRate
+            +
+            normalizedBondYield
+            * parameters.bondYieldLiquidityRate
+            +
+            normalizedBankingStress
+            * parameters.bankingLiquidityRate
+            +
+            normalizedShock
+            * parameters.externalShockEnergyWeight
+
+        let macroEnergyForcing =
+            bounded(
+                expansionaryEnergy
+                - contractionaryEnergy,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        // ----------------------------------------------------
+        // Macro momentum.
+        // ----------------------------------------------------
+
+        let growthMomentum =
+            normalizedEconomicGrowth
+            * 0.40
+            +
+            normalizedStockGrowth
+            * 0.40
+            +
+            normalizedMoneySupply
+            * 0.20
+            +
+            normalizedPolicy
+            * 0.20
+
+        let slowdownMomentum =
+            max(
+                -normalizedEconomicGrowth,
+                0.0
+            )
+            * 0.40
+            +
+            max(
+                -normalizedStockGrowth,
+                0.0
+            )
+            * 0.40
+            +
+            normalizedBondYield
+            * 0.20
+            +
+            normalizedBankingStress
+            * 0.20
+            +
+            normalizedShock
+            * 0.20
+
+        let macroMomentum =
+            bounded(
+                growthMomentum
+                - slowdownMomentum,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        // ----------------------------------------------------
+        // Macro stress.
+        // ----------------------------------------------------
+
+        let macroStress =
+            bounded(
+                normalizedInflation
+                +
+                positiveTaxPressure * 0.25
+                +
+                normalizedBondYield * 0.30
+                +
+                normalizedBankingStress * 0.40
+                +
+                negativeEconomicGrowth * 0.30
+                +
+                normalizedShock * 0.40
+            )
+
+        // ----------------------------------------------------
+        // Energy conversion.
+        //
+        // This explicitly connects energyConversion to the
+        // actual cellular energy update.
+        // ----------------------------------------------------
+
+        let baseInjectedEnergy =
+            externalForcing
+            * parameters.energyInjectionRate
+
+        let macroInjectedEnergy =
+            macroEnergyForcing
+            * parameters.macroEnergyInjectionRate
+
+        let rawInjectedEnergy =
+            baseInjectedEnergy
+            +
+            macroInjectedEnergy
+
+        let convertedInjectedEnergy =
+            rawInjectedEnergy
+            *
+            bounded(
+                parameters.energyConversion,
+                minimum: 0.0,
+                maximum: 1.0
+            )
+
+        // ----------------------------------------------------
+        // Synchronous CA update.
+        //
+        // NEVER read neighbors from nextCells.
+        // ----------------------------------------------------
+
+        let previousCells = cells
+
+        var nextCells = previousCells
+
+        for index in previousCells.indices {
+
+            let cell =
+                previousCells[index]
+
+            let neighbors =
+                neighboringCells(
+                    index: index,
+                    cells: previousCells
+                )
+
+            // ------------------------------------------------
+            // Neighbor averages.
+            // ------------------------------------------------
+
+            let neighborEnergy =
+                mean(
+                    neighbors.map(\.energy)
+                )
+
+            let neighborMomentum =
+                mean(
+                    neighbors.map(\.momentum)
+                )
+
+            let neighborPotential =
+                mean(
+                    neighbors.map(
+                        \.financialPotential
+                    )
+                )
+
+            // ------------------------------------------------
+            // Energy transfer.
+            // ------------------------------------------------
+
+            let localEnergyTransfer =
+                (
+                    neighborEnergy
+                    - cell.energy
+                )
+                *
+                parameters.energyTransferRate
+
+            let preliminaryEnergy =
+                cell.energy
+                *
+                parameters.energyRetention
+                +
+                convertedInjectedEnergy
+                +
+                localEnergyTransfer
+
+            let dissipatedEnergy =
+                max(
+                    preliminaryEnergy,
+                    0.0
+                )
+                *
+                parameters.dissipationRate
+
+            let updatedEnergy =
+                bounded(
+                    preliminaryEnergy
+                    - dissipatedEnergy
+                )
+
+            // ------------------------------------------------
+            // Momentum.
+            // ------------------------------------------------
+
+            let momentumFromExternalForce =
+                (
+                    externalForcing
+                    - 0.5
+                )
+                *
+                parameters.momentumResponse
+
+            let momentumFromMacro =
+                macroMomentum
+                *
+                parameters.macroMomentumResponse
+
+            let momentumFromGradient =
+                (
+                    neighborPotential
+                    - cell.financialPotential
+                )
+                *
+                parameters.potentialGradientResponse
+
+            let momentumTransfer =
+                (
+                    neighborMomentum
+                    - cell.momentum
+                )
+                *
+                parameters.momentumTransferRate
+
+            let updatedMomentum =
+                bounded(
+                    cell.momentum
+                    *
+                    parameters.momentumRetention
+                    +
+                    momentumFromExternalForce
+                    +
+                    momentumFromMacro
+                    +
+                    momentumFromGradient
+                    +
+                    momentumTransfer,
+                    minimum: -1.0,
+                    maximum: 1.0
+                )
+
+            // ------------------------------------------------
+            // Financial potential.
+            //
+            // This is a model-defined financial potential,
+            // not physical gravitational potential.
+            // ------------------------------------------------
+
+            let potentialInput =
+                updatedEnergy
+                *
+                parameters.potentialEnergyWeight
+                +
+                abs(updatedMomentum)
+                *
+                parameters.potentialMomentumWeight
+
+            let updatedPotential =
+                bounded(
+                    cell.financialPotential
+                    +
+                    (
+                        potentialInput
+                        -
+                        cell.financialPotential
+                    )
+                    *
+                    parameters.potentialGain
+                )
+
+            let potentialGradient =
+                bounded(
+                    updatedPotential
+                    - neighborPotential,
+                    minimum: -1.0,
+                    maximum: 1.0
+                )
+
+            // ------------------------------------------------
+            // Liquidity depletion.
+            // ------------------------------------------------
+
+            let baseLiquidityDepletion =
+                max(
+                    externalForcing,
+                    0.0
+                )
+                *
+                parameters.liquidityDepletionRate
+
+            let inflationLiquidity =
+                normalizedInflation
+                *
+                parameters.inflationLiquidityRate
+
+            let bondLiquidity =
+                normalizedBondYield
+                *
+                parameters.bondYieldLiquidityRate
+
+            let bankingLiquidity =
+                normalizedBankingStress
+                *
+                parameters.bankingLiquidityRate
+
+            let taxLiquidity =
+                positiveTaxPressure
+                *
+                parameters.taxLiquidityRate
+
+            let shockLiquidity =
+                normalizedShock
+                *
+                parameters.externalShockCapitalRate
+
+            let financialPotentialLiquidity =
+                updatedPotential
+                *
+                parameters.liquidityDepletionRate
+
+            let liquidityDepletion =
+                baseLiquidityDepletion
+                +
+                inflationLiquidity
+                +
+                bondLiquidity
+                +
+                bankingLiquidity
+                +
+                taxLiquidity
+                +
+                shockLiquidity
+                +
+                financialPotentialLiquidity
+
+            let updatedLiquidity =
+                bounded(
+                    cell.liquidity
+                    - liquidityDepletion
+                    +
+                    parameters.exhaustionRecoveryRate
+                    * 0.25
+                )
+
+            // ------------------------------------------------
+            // Capital depletion.
+            // ------------------------------------------------
+
+            let capitalDepletion =
+                updatedPotential
+                *
+                parameters.capitalDepletionRate
+                +
+                normalizedTaxGrowth
+                *
+                parameters.taxCapitalRate
+                +
+                normalizedBankingStress
+                *
+                parameters.bankingCapitalRate
+                +
+                normalizedShock
+                *
+                parameters.externalShockCapitalRate
+                +
+                max(
+                    -normalizedEconomicGrowth,
+                    0.0
+                )
+                *
+                parameters.capitalDepletionRate
+
+            let updatedCapital =
+                bounded(
+                    cell.capital
+                    - capitalDepletion
+                )
+
+            // ------------------------------------------------
+            // Neighbor contagion.
+            //
+            // Only critical/crashed neighbors contribute.
+            // ------------------------------------------------
+
+            let criticalNeighborCount =
+                neighbors.reduce(
+                    into: 0
+                ) { count, neighbor in
+
+                    if neighbor.state == .critical
+                        || neighbor.state == .crashed
+                    {
+                        count += 1
+                    }
+                }
+
+            let contagionFraction =
+                neighbors.isEmpty
+                ? 0.0
+                : Double(
+                    criticalNeighborCount
+                )
+                /
+                Double(
+                    neighbors.count
+                )
+
+            let updatedContagion =
+                bounded(
+                    contagionFraction
+                    *
+                    parameters.contagionRate
+                )
+
+            // ------------------------------------------------
+            // Resource depletion.
+            // ------------------------------------------------
+
+            let energyDepletion =
+                bounded(
+                    1.0
+                    - updatedEnergy
+                )
+
+            let resourceDepletion =
+                bounded(
+                    (
+                        1.0
+                        - updatedLiquidity
+                    )
+                    * 0.50
+                    +
+                    (
+                        1.0
+                        - updatedCapital
+                    )
+                    * 0.50
+                )
+
+            // ------------------------------------------------
+            // Exhaustion.
+            // ------------------------------------------------
+
+            let directExhaustion =
+                energyDepletion
+                *
+                parameters.energyDepletionStressWeight
+
+            let resourceExhaustion =
+                resourceDepletion
+                *
+                parameters.exhaustionAccumulationRate
+
+            let macroExhaustion =
+                macroStress
+                *
+                parameters.macroExhaustionRate
+
+            let recovery =
+                updatedLiquidity
+                *
+                updatedCapital
+                *
+                parameters.exhaustionRecoveryRate
+
+            let updatedExhaustion =
+                bounded(
+                    cell.exhaustion
+                    +
+                    directExhaustion
+                    +
+                    resourceExhaustion
+                    +
+                    macroExhaustion
+                    -
+                    recovery
+                )
+
+            // ------------------------------------------------
+            // Stress components.
+            // ------------------------------------------------
+
+            let energyStress =
+                energyDepletion
+                *
+                parameters.energyWeight
+
+            let momentumStress =
+                max(
+                    -updatedMomentum,
+                    0.0
+                )
+                *
+                parameters.momentumWeight
+
+            let potentialStress =
+                updatedPotential
+                *
+                parameters.potentialWeight
+
+            let exhaustionStress =
+                updatedExhaustion
+                *
+                parameters.exhaustionWeight
+
+            let contagionStress =
+                updatedContagion
+                *
+                parameters.contagionWeight
+
+            let macroStressComponent =
+                macroStress
+                *
+                parameters.macroStressWeight
+
+            let dissipationStress =
+                dissipatedEnergy
+                *
+                parameters.energyDissipationWeight
+
+            let potentialGradientStress =
+                abs(
+                    potentialGradient
+                )
+                *
+                parameters.potentialWeight
+                *
+                0.50
+
+            // ------------------------------------------------
+            // Stochastic perturbation.
+            //
+            // Deterministic because SplitMix64 is reset from
+            // MarketParameters.randomSeed.
+            // ------------------------------------------------
+
+            let noise =
+                random.centeredUnit()
+                *
+                0.02
+
+            let rawStress =
+                energyStress
+                +
+                momentumStress
+                +
+                potentialStress
+                +
+                exhaustionStress
+                +
+                contagionStress
+                +
+                macroStressComponent
+                +
+                dissipationStress
+                +
+                potentialGradientStress
+                +
+                noise
+
+            let updatedStress =
+                bounded(
+                    rawStress
+                )
+
+            // ------------------------------------------------
+            // State classification.
+            // ------------------------------------------------
+
+            let updatedState =
+                classifyState(
+                    stress: updatedStress,
+                    energy: updatedEnergy
+                )
+
+            nextCells[index] =
+                MarketCell(
+                    id: cell.id,
+                    energy: updatedEnergy,
+                    liquidity: updatedLiquidity,
+                    capital: updatedCapital,
+                    momentum: updatedMomentum,
+                    financialPotential: updatedPotential,
+                    potentialGradient: potentialGradient,
+                    exhaustion: updatedExhaustion,
+                    contagion: updatedContagion,
+                    stress: updatedStress,
+                    state: updatedState
+                )
+        }
+
+        // ----------------------------------------------------
+        // Commit only after every cell has been calculated.
+        // ----------------------------------------------------
+
+        cells = nextCells
+    }
+
+    // ========================================================
+    // MARK: - Neighbor Lookup
+    // ========================================================
+
+    private func neighboringCells(
+        index: Int,
+        cells: [MarketCell]
+    ) -> [MarketCell] {
+
+        let width =
+            max(
+                parameters.gridWidth,
+                1
+            )
+
+        let height =
+            max(
+                parameters.gridHeight,
+                1
+            )
+
+        let x = index % width
+        let y = index / width
+
+        let directions: [(Int, Int)]
+
+        if parameters.diagonalNeighbors {
+
+            directions = [
+                (-1, -1),
+                ( 0, -1),
+                ( 1, -1),
+                (-1,  0),
+                ( 1,  0),
+                (-1,  1),
+                ( 0,  1),
+                ( 1,  1)
+            ]
+
+        } else {
+
+            directions = [
+                ( 0, -1),
+                (-1,  0),
+                ( 1,  0),
+                ( 0,  1)
+            ]
+        }
+
+        var result: [MarketCell] = []
+
+        result.reserveCapacity(
+            directions.count
+        )
+
+        for (dx, dy) in directions {
+
+            let nx = x + dx
+            let ny = y + dy
+
+            guard nx >= 0,
+                  nx < width,
+                  ny >= 0,
+                  ny < height
+            else {
+                continue
+            }
+
+            let neighborIndex =
+                ny * width + nx
+
+            guard neighborIndex >= 0,
+                  neighborIndex < cells.count
+            else {
+                continue
+            }
+
+            result.append(
+                cells[neighborIndex]
+            )
+        }
+
+        return result
+    }
+
+    // ========================================================
+    // MARK: - Historical Data Conversion
+    // ========================================================
+
+    private func scenario(
+        from year: HistoricalYear,
+        previousYear: HistoricalYear?
+    ) -> MarketScenario {
+
+        MarketScenario(
+            moneySupplyChangePercent:
+                year.m2GrowthPercent ?? 0.0,
+
+            inflationPercent:
+                year.inflationPercent ?? 0.0,
+
+            taxationGrowthPercent:
+                year.taxGrowthPercent ?? 0.0,
+
+            economicGrowthPercent:
+                year.economicGrowthPercent ?? 0.0,
+
+            stockGrowthPercent:
+                year.stockGrowthPercent ?? 0.0,
+
+            previousStockGrowthPercent:
+                previousYear?.stockGrowthPercent
+                ??
+                year.stockGrowthPercent
+                ??
+                0.0,
+
+            bondYieldAvgPercent:
+                year.bondYieldAvgPercent ?? 0.0,
+
+            bankingCreditStressRating:
+                year.bankingCreditStressRating ?? 0.0,
+
+            moneyPolicyChangeImpact:
+                year.moneyPolicyChangeImpact ?? 0.0,
+
+            externalShockMagnitudePercent:
+                0.0
+        )
+    }
+
+    // ========================================================
+    // MARK: - Historical Year Selection
+    // ========================================================
+
+    private func historicalYear(
+        for targetYear: Int
+    ) -> HistoricalYear? {
+
+        historicalData.crashPeriods
+            .flatMap(\.priorYears)
+            .filter {
+                $0.year <= targetYear
+            }
+            .max {
+                $0.year < $1.year
+            }
+    }
+
+    private func historicalYearsThrough(
+        _ year: Int
+    ) -> [HistoricalYear] {
+
+        historicalData.crashPeriods
+            .flatMap(\.priorYears)
+            .filter {
+                $0.year <= year
+            }
+            .sorted {
+                $0.year < $1.year
+            }
+    }
+
+    // ========================================================
+    // MARK: - Historical Volume Pressure
+    // ========================================================
+
+    private func historicalVolumePressure(
+        through year: Int
+    ) -> Double {
+
+        let points =
+            historicalYearsThrough(year)
+            .compactMap { historicalYear -> MarketVolumePoint? in
+
+                guard let volume =
+                    historicalYear.stockVolumeMillions,
+                      volume.isFinite
+                else {
+                    return nil
+                }
+
+                return MarketVolumePoint(
+                    year: historicalYear.year,
+                    volumeMillions: volume
+                )
+            }
+            .sorted {
+                $0.year < $1.year
+            }
+
+        guard points.count >= 2 else {
+            return 0.0
+        }
+
+        let recent =
+            points[points.count - 1]
+
+        let previous =
+            points[points.count - 2]
+
+        let recentGrowth =
+            (
+                recent.volumeMillions
+                - previous.volumeMillions
+            )
+            /
+            max(
+                abs(previous.volumeMillions),
+                1.0
+            )
+
+        guard points.count >= 3 else {
+
+            return bounded(
+                max(
+                    recentGrowth,
+                    0.0
+                ),
+                minimum: 0.0,
+                maximum: 1.0
+            )
+        }
+
+        let older =
+            points[points.count - 3]
+
+        let previousGrowth =
+            (
+                previous.volumeMillions
+                - older.volumeMillions
+            )
+            /
+            max(
+                abs(older.volumeMillions),
+                1.0
+            )
+
+        let acceleration =
+            recentGrowth
+            - previousGrowth
+
+        let growthComponent =
+            max(
+                recentGrowth,
+                0.0
+            )
+
+        let accelerationComponent =
+            max(
+                acceleration,
+                0.0
+            )
+
+        return bounded(
+            0.70 * growthComponent
+            +
+            0.30 * accelerationComponent,
+            minimum: 0.0,
+            maximum: 1.0
+        )
+    }
+
+    // ========================================================
+    // MARK: - Historical Equilibrium Pressure
+    // ========================================================
+
+    private func historicalEquilibriumPressure(
+        for year: HistoricalYear
+    ) -> Double {
+
+        let money =
+            bounded(
+                (year.m2GrowthPercent ?? 0.0)
+                / 20.0,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        let economic =
+            bounded(
+                (year.economicGrowthPercent ?? 0.0)
+                / 20.0,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        let stock =
+            bounded(
+                (year.stockGrowthPercent ?? 0.0)
+                / 60.0,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        let policy =
+            bounded(
+                (year.moneyPolicyChangeImpact ?? 0.0)
+                / 10.0,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        let inflation =
+            bounded(
+                (year.inflationPercent ?? 0.0)
+                / 15.0
+            )
+
+        let bond =
+            bounded(
+                (year.bondYieldAvgPercent ?? 0.0)
+                / 15.0
+            )
+
+        let banking =
+            bounded(
+                (year.bankingCreditStressRating ?? 0.0)
+                / 10.0
+            )
+
+        let positiveExpansion =
+            max(money, 0.0) * 0.20
+            +
+            max(economic, 0.0) * 0.20
+            +
+            max(stock, 0.0) * 0.20
+            +
+            max(policy, 0.0) * 0.10
+
+        let contraction =
+            max(-money, 0.0) * 0.10
+            +
+            max(-economic, 0.0) * 0.15
+            +
+            inflation * 0.15
+            +
+            bond * 0.15
+            +
+            banking * 0.25
+
+        return bounded(
+            positiveExpansion
+            + contraction,
+            minimum: 0.0,
+            maximum: 1.0
+        )
+    }
+
+    // ========================================================
+    // MARK: - Cycle Pressure Exponent
+    // ========================================================
+
+    /// This is NOT an empirical power-law exponent.
+    ///
+    /// It is a model-defined cycle-pressure exponent derived
+    /// from dispersion in historical crash intervals.
+    private func estimateCyclePressureExponent(
+        intervals: [Int]
+    ) -> Double {
+
+        guard !intervals.isEmpty else {
+            return 0.5
+        }
+
+        let values =
+            intervals.map(Double.init)
+
+        let meanInterval =
+            mean(values)
+
+        guard meanInterval > 0.0 else {
+            return 0.5
+        }
+
+        let variance =
+            mean(
+                values.map {
+                    pow(
+                        $0 - meanInterval,
+                        2.0
+                    )
+                }
+            )
+
+        let standardDeviation =
+            sqrt(
+                max(
+                    variance,
+                    0.0
+                )
+            )
+
+        let coefficientOfVariation =
+            standardDeviation
+            /
+            meanInterval
+
+        let exponent =
+            (
+                1.0
+                +
+                coefficientOfVariation
+            )
+            /
+            3.0
+
+        return bounded(
+            exponent,
+            minimum: 0.25,
+            maximum: 1.0
+        )
+    }
+
+    // ========================================================
+    // MARK: - Cycle Pressure
+    // ========================================================
+
+    private func cyclePressure(
+        yearsSinceCrash: Int,
+        meanInterval: Double,
+        exponent: Double
+    ) -> Double {
+
+        guard meanInterval >= 0.0 else {
+            return 0.0
+        }
+
+        let x =
+            (
+                Double(
+                    max(
+                        yearsSinceCrash,
+                        0
+                    )
+                )
+                +
+                1.0
+            )
+            /
+            (
+                meanInterval
+                +
+                1.0
+            )
+
+        let raw =
+            pow(
+                max(x, 0.0),
+                bounded(
+                    exponent,
+                    minimum: 0.25,
+                    maximum: 1.0
+                )
+            )
+
+        return bounded(
+            raw
+        )
+    }
+
+    // ========================================================
+    // MARK: - Historical Crash Analysis
+    // ========================================================
+
+    @discardableResult
+    func analyzeHistoricalCrash(
+        at period: HistoricalCrashPeriod
+    ) -> HistoricalCrashAnalysis? {
+
+        guard validateHistoricalCausality(
+            period: period
+        )
+        else {
+            return nil
+        }
+
+        resetCells()
+
+        let sortedYears =
+            period.priorYears.sorted {
+                $0.year < $1.year
+            }
+
+        guard !sortedYears.isEmpty else {
+            return nil
+        }
+
+        let crashIntervals =
+            historicalData.crashPeriods
+                .map(\.crashYear)
+                .sorted()
+                .adjacentPairs()
+                .map {
+                    $1 - $0
+                }
+
+        let exponent =
+            estimateCyclePressureExponent(
+                intervals: crashIntervals
+            )
+
+        let meanInterval =
+            mean(
+                crashIntervals.map(Double.init)
+            )
+
+        var previousYear:
+            HistoricalYear?
+
+        var finalResult:
+            MarketRiskResult?
+
+        for historicalYear in sortedYears {
+
+            let scenarioValue =
+                scenario(
+                    from: historicalYear,
+                    previousYear: previousYear
+                )
+
+            let equilibrium =
+                historicalEquilibriumPressure(
+                    for: historicalYear
+                )
+
+            let volume =
+                historicalVolumePressure(
+                    through: historicalYear.year
+                )
+
+            let yearsSincePreviousCrash =
+                max(
+                    historicalYear.year
+                    -
+                    latestCrashYear(
+                        before: historicalYear.year
+                    ),
+                    0
+                )
+
+            let cycle =
+                cyclePressure(
+                    yearsSinceCrash:
+                        yearsSincePreviousCrash,
+                    meanInterval:
+                        meanInterval,
+                    exponent:
+                        exponent
+                )
+
+            let combinedEquilibrium =
+                bounded(
+                    0.70 * equilibrium
+                    +
+                    0.30 * cycle
+                )
+
+            finalResult =
+                runYear(
+                    year:
+                        historicalYear.year,
+                    equilibriumPressure:
+                        combinedEquilibrium,
+                    volumePressure:
+                        volume,
+                    scenario:
+                        scenarioValue
+                )
+
+            historicalFrames.append(
+                HistoricalCAFrame(
+                    year:
+                        historicalYear.year,
+                    isCrashYear:
+                        false,
+                    moneyEnergyChange:
+                        scenarioValue
+                            .moneySupplyChangePercent,
+                    volumePressure:
+                        volume,
+                    cells:
+                        cells
+                )
+            )
+
+            previousYear =
+                historicalYear
+        }
+
+        guard let result = finalResult else {
+            return nil
+        }
+
+        let interval =
+            period.crashYear
+            -
+            sortedYears.last!.year
+
+        let analysis =
+            makeHistoricalAnalysis(
+                period: period,
+                result: result
+            )
+
+        historicalAnalyses.append(
+            HistoricalCrashAnalysis(
+                year:
+                    period.crashYear,
+                intervalYears:
+                    interval,
+                result:
+                    result,
+                cells:
+                    cells
+            )
+        )
+
+        return HistoricalCrashAnalysis(
+            year:
+                period.crashYear,
+            intervalYears:
+                interval,
+            result:
+                result,
+            cells:
+                cells
+        )
+    }
+
+    // ========================================================
+    // MARK: - Analyze All Historical Crashes
+    // ========================================================
+
+    @discardableResult
+    func analyzeAllHistoricalCrashes()
+        -> [HistoricalCrashAnalysis]
+    {
+        historicalAnalyses.removeAll(
+            keepingCapacity: true
+        )
+
+        historicalFrames.removeAll(
+            keepingCapacity: true
+        )
+
+        for period in historicalData.crashPeriods {
+
+            _ = analyzeHistoricalCrash(
+                at: period
+            )
+        }
+
+        return historicalAnalyses
+    }
+
+    // ========================================================
+    // MARK: - Historical Rows
+    // ========================================================
+
+    func historicalCARows()
+        -> [HistoricalCARow]
+    {
+        var rows: [HistoricalCARow] = []
+
+        for period in historicalData.crashPeriods {
+
+            guard let analysis =
+                analyzeHistoricalCrash(
+                    at: period
+                )
+            else {
+                continue
+            }
+
+            let historicalAnalysis =
+                makeHistoricalAnalysis(
+                    period: period,
+                    result: analysis.result
+                )
+
+            rows.append(
+                HistoricalCARow(
+                    period:
+                        period,
+                    analysis:
+                        historicalAnalysis,
+                    result:
+                        analysis.result,
+                    cells:
+                        analysis.cells
+                )
+            )
+        }
+
+        return rows
+    }
+
+    // ========================================================
+    // MARK: - Historical Analysis Builder
+    // ========================================================
+
+    private func makeHistoricalAnalysis(
+        period: HistoricalCrashPeriod,
+        result: MarketRiskResult
+    ) -> HistoricalAnalysis {
+
+        let years =
+            period.priorYears.sorted {
+                $0.year < $1.year
+            }
+
+        let latest =
+            years.last
+
+        let previous =
+            years.dropLast().last
+
+        let crashInterval =
+            period.crashYear
+            -
+            (latest?.year ?? period.crashYear)
+
+        let stockVolumeGrowth =
+            historicalVolumePressure(
+                through:
+                    latest?.year
+                    ??
+                    period.crashYear
+            )
+
+        let intervals =
+            historicalData.crashPeriods
+                .map(\.crashYear)
+                .sorted()
+                .adjacentPairs()
+                .map {
+                    $1 - $0
+                }
+
+        let powerLaw =
+            estimateCyclePressureExponent(
+                intervals:
+                    intervals
+            )
+
+        let equilibrium =
+            latest.map {
+                historicalEquilibriumPressure(
+                    for: $0
+                )
+            }
+            ?? 0.0
+
+        let optimism =
+            bounded(
+                max(
+                    latest?.economicGrowthPercent
+                        ?? 0.0,
+                    0.0
+                ) / 20.0
+                +
+                max(
+                    latest?.stockGrowthPercent
+                        ?? 0.0,
+                    0.0
+                ) / 60.0
+            )
+
+        let momentum =
+            bounded(
+                (
+                    latest?.stockGrowthPercent
+                        ?? 0.0
+                ) / 60.0,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        let previousMomentum =
+            bounded(
+                (
+                    previous?.stockGrowthPercent
+                        ?? latest?.stockGrowthPercent
+                        ?? 0.0
+                ) / 60.0,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        let momentumTurn =
+            bounded(
+                previousMomentum
+                - momentum,
+                minimum: -1.0,
+                maximum: 1.0
+            )
+
+        return HistoricalAnalysis(
+            crashYear:
+                period.crashYear,
+
+            priorYearsUsed:
+                years.map(\.year),
+
+            m2Growth:
+                latest?.m2GrowthPercent ?? 0.0,
+
+            inflation:
+                latest?.inflationPercent ?? 0.0,
+
+            bondYield:
+                latest?.bondYieldAvgPercent ?? 0.0,
+
+            taxGrowth:
+                latest?.taxGrowthPercent ?? 0.0,
+
+            economicGrowth:
+                latest?.economicGrowthPercent ?? 0.0,
+
+            stockGrowth:
+                latest?.stockGrowthPercent ?? 0.0,
+
+            stockVolumeGrowth:
+                stockVolumeGrowth,
+
+            moneyPolicyChangeImpact:
+                latest?.moneyPolicyChangeImpact ?? 0.0,
+
+            crashInterval:
+                crashInterval,
+
+            optimism:
+                optimism,
+
+            momentum:
+                momentum,
+
+            momentumTurn:
+                momentumTurn,
+
+            equilibrium:
+                equilibrium,
+
+            powerLaw:
+                powerLaw,
+
+            cellularRisk:
+                result.systemicRisk,
+
+            bankingCreditStressRating:
+                latest?.bankingCreditStressRating ?? 0.0
+        )
+    }
+
+    // ========================================================
+    // MARK: - Historical Causality
+    // ========================================================
+
+    func validateHistoricalCausality(
+        year: Int
+    ) -> Bool {
+
+        let allHistoricalYears =
+            historicalData.crashPeriods
+                .flatMap(\.priorYears)
+
+        if let selected =
+            historicalYear(
+                for: year
+            ) {
+
+            guard selected.year <= year else {
+                return false
+            }
+        }
+
+        let selectedRows =
+            allHistoricalYears.filter {
+                $0.year <= year
+            }
+
+        guard selectedRows.allSatisfy({
+            $0.year <= year
+        })
+        else {
+            return false
+        }
+
+        let eligibleCrashes =
+            crashRecords.filter {
+                $0.year <= year
+            }
+
+        if let latest =
+            eligibleCrashes.last {
+
+            let canonicalLatest =
+                crashRecords.last(
+                    where: {
+                        $0.year <= year
+                    }
+                )
+
+            guard canonicalLatest?.year
+                    == latest.year
+            else {
+                return false
+            }
+        }
+
+        return true
+    }
+    private var crashRecords: [CrashRecord] {
+        historicalData.crashPeriods.map { period in
+            CrashRecord(
+                year: period.crashYear,
+                volumeMillions:
+                    period.priorYears
+                        .last(where: { $0.stockVolumeMillions != nil })?
+                        .stockVolumeMillions
+                        ?? 0.0
+            )
+        }
+    }
+    private func validateHistoricalCausality(
+        period: HistoricalCrashPeriod
+    ) -> Bool {
+
+        period.priorYears.allSatisfy {
+            $0.year < period.crashYear
+        }
+    }
+
+    // ========================================================
+    // MARK: - Latest Crash
+    // ========================================================
+
+    private func latestCrashYear(
+        before year: Int
+    ) -> Int {
+
+        historicalData.crashPeriods
+            .map(\.crashYear)
+            .filter {
+                $0 < year
+            }
+            .max()
+            ?? year
+    }
+
+    // ========================================================
+    // MARK: - Risk Result
+    // ========================================================
+
+    private func makeRiskResult(
+        year: Int,
+        equilibriumPressure: Double,
+        volumePressure: Double
+    ) -> MarketRiskResult {
+
+        let meanEnergy =
+            mean(
+                cells.map(\.energy)
+            )
+
+        let meanMomentum =
+            mean(
+                cells.map(\.momentum)
+            )
+
+        let meanExhaustion =
+            mean(
+                cells.map(\.exhaustion)
+            )
+
+        let meanStress =
+            mean(
+                cells.map(\.stress)
+            )
+
+        let meanFinancialPotential =
+            mean(
+                cells.map(
+                    \.financialPotential
+                )
+            )
+
+        let critical =
+            criticalCellFraction()
+
+        let crashed =
+            crashCellFraction()
+
+        let systemic =
+            systemicRisk(
+                equilibrium:
+                    equilibriumPressure,
+                volume:
+                    volumePressure,
+                stress:
+                    meanStress,
+                critical:
+                    critical,
+                crashed:
+                    crashed
+            )
+
+        return MarketRiskResult(
+            year:
+                year,
+
+            equilibriumPressure:
+                bounded(
+                    equilibriumPressure
+                ),
+
+            volumePressure:
+                bounded(
+                    volumePressure
+                ),
+
+            meanEnergy:
+                bounded(
+                    meanEnergy
+                ),
+
+            meanMomentum:
+                bounded(
+                    meanMomentum,
+                    minimum: -1.0,
+                    maximum: 1.0
+                ),
+
+            meanExhaustion:
+                bounded(
+                    meanExhaustion
+                ),
+
+            meanStress:
+                bounded(
+                    meanStress
+                ),
+
+            meanFinancialPotential:
+                bounded(
+                    meanFinancialPotential
+                ),
+
+            criticalFraction:
+                critical,
+
+            crashFraction:
+                crashed,
+
+            systemicRisk:
+                systemic,
+
+            riskLevel:
+                classifyState(
+                    stress:
+                        systemic,
+                    energy:
+                        1.0
+                )
+        )
+    }
+
+    // ========================================================
+    // MARK: - Systemic Risk
+    // ========================================================
+
+    private func systemicRisk(
+        equilibrium: Double,
+        volume: Double,
+        stress: Double,
+        critical: Double,
+        crashed: Double
+    ) -> Double {
+
+        let result =
+            equilibrium
+            *
+            parameters.systemicEquilibriumWeight
+            +
+            volume
+            *
+            parameters.systemicVolumeWeight
+            +
+            stress
+            *
+            parameters.systemicStressWeight
+            +
+            critical
+            *
+            parameters.systemicCriticalWeight
+            +
+            crashed
+            *
+            parameters.systemicCrashWeight
+
+        return bounded(
+            result
+        )
+    }
+
+    // ========================================================
+    // MARK: - State Classification
+    // ========================================================
+
+    private func classifyState(
+        stress: Double,
+        energy: Double
+    ) -> MarketState {
+
+        let normalizedStress =
+            bounded(
+                stress
+            )
+
+        let normalizedEnergy =
+            bounded(
+                energy
+            )
+
+        if normalizedEnergy
+            <= parameters
+                .severeEnergyDepletionThreshold
+        {
+            return .crashed
+        }
+
+        if normalizedStress
+            >= parameters.crashedThreshold
+        {
+            return .crashed
+        }
+
+        if normalizedStress
+            >= parameters.criticalThreshold
+        {
+            return .critical
+        }
+
+        if normalizedStress
+            >= parameters.stressedThreshold
+        {
+            return .stressed
+        }
+
+        if normalizedStress
+            >= parameters.risingThreshold
+        {
+            return .rising
+        }
+
+        return .stable
+    }
+
+    // ========================================================
+    // MARK: - Fractions
+    // ========================================================
+
+    func criticalCellFraction() -> Double {
+
+        guard !cells.isEmpty else {
+            return 0.0
+        }
+
+        let count =
+            cells.reduce(
+                into: 0
+            ) { result, cell in
+
+                if cell.state == .critical {
+                    result += 1
+                }
+            }
+
+        return bounded(
+            Double(count)
+            /
+            Double(cells.count)
+        )
+    }
+
+    func crashCellFraction() -> Double {
+
+        guard !cells.isEmpty else {
+            return 0.0
+        }
+
+        let count =
+            cells.reduce(
+                into: 0
+            ) { result, cell in
+
+                if cell.state == .crashed {
+                    result += 1
+                }
+            }
+
+        return bounded(
+            Double(count)
+            /
+            Double(cells.count)
+        )
+    }
+
+    // ========================================================
+    // MARK: - Current State Accessors
+    // ========================================================
+
+    func meanEnergy() -> Double {
+        mean(
+            cells.map(\.energy)
+        )
+    }
+
+    func meanMomentum() -> Double {
+        mean(
+            cells.map(\.momentum)
+        )
+    }
+
+    func meanExhaustion() -> Double {
+        mean(
+            cells.map(\.exhaustion)
+        )
+    }
+
+    func meanStress() -> Double {
+        mean(
+            cells.map(\.stress)
+        )
+    }
+
+    func meanFinancialPotential() -> Double {
+        mean(
+            cells.map(
+                \.financialPotential
+            )
+        )
+    }
+
+    func currentSystemicRisk(
+        equilibriumPressure: Double = 0.0,
+        volumePressure: Double = 0.0
+    ) -> Double {
+
+        systemicRisk(
+            equilibrium:
+                equilibriumPressure,
+            volume:
+                volumePressure,
+            stress:
+                meanStress(),
+            critical:
+                criticalCellFraction(),
+            crashed:
+                crashCellFraction()
+        )
+    }
+
+    func riskLevel(
+        equilibriumPressure: Double = 0.0,
+        volumePressure: Double = 0.0
+    ) -> MarketState {
+
+        classifyState(
+            stress:
+                currentSystemicRisk(
+                    equilibriumPressure:
+                        equilibriumPressure,
+                    volumePressure:
+                        volumePressure
+                ),
+            energy:
+                1.0
+        )
+    }
+
+    // ========================================================
+    // MARK: - Parameter Validation
+    // ========================================================
+
+    func validateParameters()
+        -> [String]
+    {
+        var errors: [String] = []
+
+        if parameters.gridWidth < 1 {
+            errors.append(
+                "gridWidth must be at least 1."
+            )
+        }
+
+        if parameters.gridHeight < 1 {
+            errors.append(
+                "gridHeight must be at least 1."
+            )
+        }
+
+        if parameters.generationsPerYear < 1 {
+            errors.append(
+                "generationsPerYear must be at least 1."
+            )
+        }
+
+        if !parameters.energyConversion.isFinite
+            || parameters.energyConversion < 0.0
+            || parameters.energyConversion > 1.0
+        {
+            errors.append(
+                "energyConversion must be between 0 and 1."
+            )
+        }
+
+        if !(
+            parameters.risingThreshold
+            <= parameters.stressedThreshold
+            &&
+            parameters.stressedThreshold
+            <= parameters.criticalThreshold
+            &&
+            parameters.criticalThreshold
+            <= parameters.crashedThreshold
+        ) {
+            errors.append(
+                "State thresholds must be ordered rising <= stressed <= critical <= crashed."
+            )
+        }
+
+        let systemicWeightSum =
+            parameters.systemicEquilibriumWeight
+            +
+            parameters.systemicVolumeWeight
+            +
+            parameters.systemicStressWeight
+            +
+            parameters.systemicCriticalWeight
+            +
+            parameters.systemicCrashWeight
+
+        if abs(
+            systemicWeightSum - 1.0
+        ) > 0.000001 {
+
+            errors.append(
+                "Systemic-risk weights must sum to 1.0."
+            )
+        }
+
+        return errors
+    }
+
+    // ========================================================
+    // MARK: - Historical Data Validation
+    // ========================================================
+
+    func validateHistoricalData()
+        -> [String]
+    {
+        var errors: [String] = []
+
+        for period in historicalData.crashPeriods {
+
+            if !validateHistoricalCausality(
+                period: period
+            ) {
+                errors.append(
+                    "Crash year \(period.crashYear) contains a prior year that is not earlier than the crash year."
+                )
+            }
+
+            let years =
+                period.priorYears.map(\.year)
+
+            if Set(years).count != years.count {
+                errors.append(
+                    "Crash year \(period.crashYear) contains duplicate historical years."
+                )
+            }
+        }
+
+        return errors
+    }
+
+    // ========================================================
+    // MARK: - Historical Data Access
+    // ========================================================
+
+    func historicalCrashPeriods()
+        -> [HistoricalCrashPeriod]
+    {
+        historicalData.crashPeriods
+            .sorted {
+                $0.crashYear < $1.crashYear
+            }
+    }
+
+    func historicalScenario(
+        for year: Int
+    ) -> MarketScenario {
+
+        guard let selected =
+            historicalYear(
+                for: year
+            )
+        else {
+            return .neutral
+        }
+
+        let previous =
+            historicalYearsThrough(
+                selected.year
+            )
+            .dropLast()
+            .last
+
+        return scenario(
+            from:
+                selected,
+            previousYear:
+                previous
+        )
+    }
+
+    // ========================================================
+    // MARK: - Detailed Historical CA Result
+    // ========================================================
+
+    func makeHistoricalCAResult(
+        for period: HistoricalCrashPeriod
+    ) -> HistoricalCAResult? {
+
+        guard let analysis =
+            analyzeHistoricalCrash(
+                at: period
+            )
+        else {
+            return nil
+        }
+
+        let result =
+            analysis.result
+
+        let latest =
+            period.priorYears
+                .sorted {
+                    $0.year < $1.year
+                }
+                .last
+
+        let scenarioValue =
+            latest.map {
+                scenario(
+                    from: $0,
+                    previousYear:
+                        period.priorYears
+                            .sorted {
+                                $0.year < $1.year
+                            }
+                            .dropLast()
+                            .last
+                )
+            }
+            ?? .neutral
+
+        let energyDepletion =
+            bounded(
+                1.0
+                - result.meanEnergy
+            )
+
+        let stockSlowdown =
+            bounded(
+                max(
+                    -scenarioValue.stockGrowthPercent,
+                    0.0
+                ) / 60.0
+            )
+
+        let inflationPressure =
+            bounded(
+                scenarioValue.inflationPercent
+                / 15.0
+            )
+
+        let shockPressure =
+            bounded(
+                abs(
+                    scenarioValue
+                        .externalShockMagnitudePercent
+                )
+                / 20.0
+            )
+
+        let bankingStress =
+            bounded(
+                scenarioValue
+                    .bankingCreditStressRating
+                / 10.0
+            )
+
+        let bankingPolicyInteraction =
+            bounded(
+                bankingStress
+                *
+                abs(
+                    scenarioValue
+                        .moneyPolicyChangeImpact
+                )
+                / 10.0
+            )
+
+        let equilibriumInflection =
+            bounded(
+                abs(
+                    result.equilibriumPressure
+                    -
+                    result.volumePressure
+                )
+            )
+
+        let usefulFuel =
+            bounded(
+                result.meanEnergy
+                *
+                (
+                    1.0
+                    -
+                    result.meanExhaustion
+                )
+            )
+
+        let overdrivePressure =
+            bounded(
+                result.meanFinancialPotential
+                *
+                result.meanMomentum
+            )
+
+        let effectiveFinancialMass =
+            bounded(
+                result.meanFinancialPotential
+                *
+                (
+                    0.5
+                    +
+                    result.meanEnergy
+                    * 0.5
+                )
+            )
+
+        let financialPathForce =
+            bounded(
+                abs(
+                    mean(
+                        cells.map(
+                            \.potentialGradient
+                        )
+                    )
+                )
+            )
+
+        let contagion =
+            bounded(
+                mean(
+                    cells.map(
+                        \.contagion
+                    )
+                )
+            )
+
+        let nonlinearFinancialAttractor =
+            bounded(
+                result.meanFinancialPotential
+                *
+                result.meanFinancialPotential
+                *
+                (
+                    0.5
+                    +
+                    result.meanStress
+                )
+            )
+
+        return HistoricalCAResult(
+            crashYear:
+                period.crashYear,
+
+            meanEnergy:
+                result.meanEnergy,
+
+            meanMomentum:
+                result.meanMomentum,
+
+            meanExhaustion:
+                result.meanExhaustion,
+
+            meanStress:
+                result.meanStress,
+
+            meanFinancialPotential:
+                result.meanFinancialPotential,
+
+            criticalFraction:
+                result.criticalFraction,
+
+            releaseFraction:
+                result.crashFraction,
+
+            energyDepletion:
+                energyDepletion,
+
+            stockSlowdown:
+                stockSlowdown,
+
+            inflationPressure:
+                inflationPressure,
+
+            shockPressure:
+                shockPressure,
+
+            bankingStress:
+                bankingStress,
+
+            bankingPolicyInteraction:
+                bankingPolicyInteraction,
+
+            equilibriumPressure:
+                result.equilibriumPressure,
+
+            equilibriumInflection:
+                equilibriumInflection,
+
+            usefulFuel:
+                usefulFuel,
+
+            overdrivePressure:
+                overdrivePressure,
+
+            systemicRisk:
+                result.systemicRisk,
+
+            finalEnergy:
+                result.meanEnergy,
+
+            finalMomentum:
+                result.meanMomentum,
+
+            financialPotential:
+                result.meanFinancialPotential,
+
+            potentialGradient:
+                financialPathForce,
+
+            localExhaustion:
+                result.meanExhaustion,
+
+            totalExhaustion:
+                bounded(
+                    result.meanExhaustion
+                    +
+                    energyDepletion
+                    * 0.5
+                ),
+
+            effectiveFinancialMass:
+                effectiveFinancialMass,
+
+            financialPathForce:
+                financialPathForce,
+
+            contagion:
+                contagion,
+
+            nonlinearFinancialAttractor:
+                nonlinearFinancialAttractor,
+
+            cells:
+                analysis.cells
+        )
+    }
+
+    // ========================================================
+    // MARK: - Utility
     // ========================================================
 
     private func bounded(
@@ -220,2796 +2810,101 @@ final class MarketExhaustionEngine: ObservableObject {
         )
     }
 
-    private func safeDivide(
-        _ numerator: Double,
-        _ denominator: Double,
-        fallback: Double = 0.0
+    private func mean(
+        _ values: [Double]
     ) -> Double {
 
-        guard numerator.isFinite,
-              denominator.isFinite,
-              abs(denominator) > Double.leastNonzeroMagnitude
-        else {
-            return fallback
-        }
-
-        let result = numerator / denominator
-
-        guard result.isFinite else {
-            return fallback
-        }
-
-        return result
-    }
-
-    private func normalized(
-        _ value: Double,
-        minimum: Double,
-        maximum: Double
-    ) -> Double {
-
-        guard maximum > minimum else {
+        guard !values.isEmpty else {
             return 0.0
         }
 
-        return bounded(
-            safeDivide(
-                value - minimum,
-                maximum - minimum
-            )
+        let finiteValues =
+            values.filter {
+                $0.isFinite
+            }
+
+        guard !finiteValues.isEmpty else {
+            return 0.0
+        }
+
+        return finiteValues.reduce(
+            0.0,
+            +
+        )
+        /
+        Double(
+            finiteValues.count
         )
     }
 
     // ========================================================
-    // MARK: - Historical Data Loading
+    // MARK: - Historical JSON Decoder
     // ========================================================
 
-    private func loadHistoricalYears() -> [HistoricalYear] {
+    private static func decodeHistoricalData(
+        _ json: String
+    ) -> HistoricalJSONRoot {
 
-        guard let data = historicalMarketJSON.data(
-            using: .utf8
-        ) else {
-            return []
+        guard let data =
+            json.data(
+                using: .utf8
+            )
+        else {
+            return HistoricalJSONRoot(
+                crashPeriods: []
+            )
         }
 
         do {
 
-            let root = try JSONDecoder().decode(
+            return try JSONDecoder().decode(
                 HistoricalJSONRoot.self,
                 from: data
             )
 
-            var result: [HistoricalYear] = []
-
-            for period in root.crashPeriods {
-
-                result.append(
-                    contentsOf: period.priorYears
-                )
-            }
-
-            // Remove duplicate years.
-            var byYear: [Int: HistoricalYear] = [:]
-
-            for item in result {
-                byYear[item.year] = item
-            }
-
-            return byYear.values.sorted {
-                $0.year < $1.year
-            }
-
         } catch {
 
-            return []
-        }
-    }
-
-    // ========================================================
-    // MARK: - Historical Scenario
-    // ========================================================
-
-    /// Returns the latest historical observation that would
-    /// have been available for the requested year.
-    ///
-    /// Example:
-    ///
-    /// analyze 2008
-    ///      ↓
-    /// latest embedded observation <= 2008
-    ///      ↓
-    /// 2007 data
-    ///
-    /// This avoids using future information.
-    private func historicalScenario(
-        for year: Int
-    ) -> MarketScenario {
-
-        let eligible = historicalYears.filter {
-            $0.year <= year
-        }
-
-        guard let current = eligible.last else {
-            return MarketScenario()
-        }
-
-        let previous = eligible.dropLast().last
-
-        return MarketScenario(
-
-            moneySupplyChangePercent:
-                finiteOrZero(
-                    current.m2GrowthPercent
-                ),
-
-            inflationPercent:
-                finiteOrZero(
-                    current.inflationPercent
-                ),
-
-            taxationPercent:
-                finiteOrZero(
-                    current.taxGrowthPercent
-                ),
-
-            economicGrowthPercent:
-                finiteOrZero(
-                    current.economicGrowthPercent
-                ),
-
-            stockGrowthPercent:
-                finiteOrZero(
-                    current.stockGrowthPercent
-                ),
-
-            previousStockGrowthPercent:
-                finiteOrZero(
-                    previous?.stockGrowthPercent
-                ),
-
-            bondYieldAvgPercent:
-                finiteOrZero(
-                    current.bondYieldAvgPercent
-                ),
-
-            bankingCreditStressRating:
-                finiteOrZero(
-                    current.bankingCreditStressRating
-                ),
-
-            moneyPolicyChangeImpact:
-                finiteOrZero(
-                    current.moneyPolicyChangeImpact
-                ),
-
-            externalShockMagnitudePercent:
-                0.0
-        )
-    }
-
-    private func finiteOrZero(
-        _ value: Double?
-    ) -> Double {
-
-        guard let value,
-              value.isFinite
-        else {
-            return 0.0
-        }
-
-        return value
-    }
-
-    // ========================================================
-    // MARK: - Historical Cycle Pressure
-    // ========================================================
-
-    /// Backward-compatible public API.
-    ///
-    /// This is retained for the UI and existing callers.
-    ///
-    /// Internally the quantity is a model-defined cycle-pressure
-    /// exponent derived from crash-interval dispersion. It is not
-    /// a conventional statistical power-law maximum-likelihood
-    /// exponent.
-    func estimatePowerLawAlpha() -> Double {
-
-        guard crashRecords.count >= 2 else {
-            return 2.0
-        }
-
-        return estimateCyclePressureExponent(
-            upThroughCrashIndex:
-                crashRecords.count - 1
-        )
-    }
-
-    private func estimateCyclePressureExponent(
-        upThroughCrashIndex crashIndex: Int
-    ) -> Double {
-
-        guard crashIndex > 0,
-              crashIndex < crashRecords.count
-        else {
-            return 2.0
-        }
-
-        let intervals = crashIntervals(
-            upThroughCrashIndex:
-                crashIndex
-        )
-
-        guard intervals.count >= 2 else {
-            return 2.0
-        }
-
-        let mean =
-            intervals.reduce(
-                0.0,
-                +
-            ) /
-            Double(intervals.count)
-
-        guard mean > 0.0,
-              mean.isFinite
-        else {
-            return 2.0
-        }
-
-        var variance = 0.0
-
-        for interval in intervals {
-
-            let difference =
-                interval - mean
-
-            variance +=
-                difference * difference
-        }
-
-        variance /=
-            Double(
-                max(
-                    intervals.count - 1,
-                    1
-                )
+            assertionFailure(
+                "Historical market JSON failed to decode: \(error)"
             )
 
-        let standardDeviation =
-            sqrt(
-                max(
-                    variance,
-                    0.0
-                )
+            return HistoricalJSONRoot(
+                crashPeriods: []
             )
-
-        guard standardDeviation.isFinite else {
-            return 2.0
         }
-
-        let coefficient =
-            safeDivide(
-                standardDeviation,
-                mean,
-                fallback: 0.0
-            )
-
-        let boundedCoefficient =
-            min(
-                max(
-                    coefficient,
-                    0.0
-                ),
-                2.0
-            )
-
-        let alpha =
-            1.0 +
-            boundedCoefficient
-
-        return bounded(
-            alpha / 3.0,
-            minimum: 0.25,
-            maximum: 1.0
-        )
     }
+}
 
-    // ========================================================
-    // MARK: - Crash Intervals
-    // ========================================================
+// ============================================================
+// MARK: - Collection Helper
+// ============================================================
 
-    private func crashIntervals() -> [Double] {
+private extension Array {
 
-        guard crashRecords.count >= 2 else {
+    func adjacentPairs()
+        -> [(Element, Element)]
+    {
+        guard count >= 2 else {
             return []
         }
 
-        return crashIntervals(
-            upThroughCrashIndex:
-                crashRecords.count - 1
-        )
-    }
-
-    private func crashIntervals(
-        upThroughCrashIndex crashIndex: Int
-    ) -> [Double] {
-
-        guard crashIndex > 0,
-              crashIndex < crashRecords.count
-        else {
-            return []
-        }
-
-        var result: [Double] = []
-
-        for index in 1...crashIndex {
-
-            let previous =
-                crashRecords[index - 1]
-
-            let current =
-                crashRecords[index]
-
-            let interval =
-                Double(
-                    max(
-                        current.year -
-                        previous.year,
-                        1
-                    )
-                )
-
-            if interval.isFinite {
-                result.append(interval)
-            }
-        }
-
-        return result
-    }
-
-    // ========================================================
-    // MARK: - Cycle Pressure
-    // ========================================================
-
-    func powerLawPressure(
-        yearsSinceCrash: Int
-    ) -> Double {
-
-        let intervals =
-            crashIntervals()
-
-        let alpha =
-            estimatePowerLawAlpha()
-
-        return powerLawPressure(
-            yearsSinceCrash:
-                yearsSinceCrash,
-            alpha:
-                alpha,
-            intervals:
-                intervals
-        )
-    }
-
-    private func powerLawPressure(
-        yearsSinceCrash: Int,
-        alpha: Double,
-        intervals: [Double]
-    ) -> Double {
-
-        guard !intervals.isEmpty else {
-            return 0.0
-        }
-
-        let positiveIntervals =
-            intervals.filter {
-                $0.isFinite &&
-                $0 > 0.0
-            }
-
-        guard !positiveIntervals.isEmpty else {
-            return 0.0
-        }
-
-        let meanInterval =
-            positiveIntervals.reduce(
-                0.0,
-                +
-            ) /
-            Double(
-                positiveIntervals.count
-            )
-
-        guard meanInterval > 0.0 else {
-            return 0.0
-        }
-
-        let elapsed =
-            max(
-                Double(yearsSinceCrash),
-                0.0
-            )
-
-        let x =
-            safeDivide(
-                elapsed + 1.0,
-                meanInterval + 1.0,
-                fallback: 0.0
-            )
-
-        let exponent =
-            min(
-                max(
-                    alpha,
-                    0.05
-                ),
-                4.0
-            )
-
-        let raw =
-            pow(
-                max(x, 0.0),
-                exponent
-            )
-
-        guard raw.isFinite else {
-            return 0.0
-        }
-
-        return bounded(raw)
-    }
-
-    // ========================================================
-    // MARK: - Volume Pressure
-    // ========================================================
-
-    func calculateVolumePressure() -> Double {
-
-        guard crashRecords.count >= 3 else {
-            return 0.0
-        }
-
-        let recent =
-            crashRecords[
-                crashRecords.count - 1
-            ]
-
-        let previous =
-            crashRecords[
-                crashRecords.count - 2
-            ]
-
-        let older =
-            crashRecords[
-                crashRecords.count - 3
-            ]
-
-        return volumePressure(
-            recent:
-                recent.volumeMillions,
-            previous:
-                previous.volumeMillions,
-            older:
-                older.volumeMillions
-        )
-    }
-
-    private func calculateCurrentVolumePressure(
-        points: [MarketVolumePoint]
-    ) -> Double {
-
-        let sorted =
-            points.sorted {
-                $0.year < $1.year
-            }
-
-        guard sorted.count >= 3 else {
-            return 0.0
-        }
-
-        let recent =
-            sorted[sorted.count - 1]
-                .volumeMillions
-
-        let previous =
-            sorted[sorted.count - 2]
-                .volumeMillions
-
-        let older =
-            sorted[sorted.count - 3]
-                .volumeMillions
-
-        return volumePressure(
-            recent:
-                recent,
-            previous:
-                previous,
-            older:
-                older
-        )
-    }
-
-    /// Calculates pressure from the three crash observations
-    /// immediately available at a given historical year.
-    ///
-    /// This is deliberately not called with the terminal crash
-    /// record for every year of a historical interval.
-    private func historicalVolumePressure(
-        forYear year: Int
-    ) -> Double {
-
-        let eligible =
-            crashRecords.filter {
-                $0.year <= year
-            }
-
-        guard eligible.count >= 3 else {
-            return 0.0
-        }
-
-        let recent =
-            eligible[eligible.count - 1]
-
-        let previous =
-            eligible[eligible.count - 2]
-
-        let older =
-            eligible[eligible.count - 3]
-
-        return volumePressure(
-            recent:
-                recent.volumeMillions,
-            previous:
-                previous.volumeMillions,
-            older:
-                older.volumeMillions
-        )
-    }
-
-    private func historicalVolumePressure(
-        crashIndex: Int
-    ) -> Double {
-
-        guard crashIndex >= 2,
-              crashIndex < crashRecords.count
-        else {
-            return 0.0
-        }
-
-        let recent =
-            crashRecords[crashIndex]
-
-        let previous =
-            crashRecords[crashIndex - 1]
-
-        let older =
-            crashRecords[crashIndex - 2]
-
-        return volumePressure(
-            recent:
-                recent.volumeMillions,
-            previous:
-                previous.volumeMillions,
-            older:
-                older.volumeMillions
-        )
-    }
-
-    private func volumePressure(
-        recent: Double,
-        previous: Double,
-        older: Double
-    ) -> Double {
-
-        guard recent.isFinite,
-              previous.isFinite,
-              older.isFinite
-        else {
-            return 0.0
-        }
-
-        let previousGrowth =
-            safeDivide(
-                previous - older,
-                max(
-                    abs(older),
-                    1.0
-                )
-            )
-
-        let recentGrowth =
-            safeDivide(
-                recent - previous,
-                max(
-                    abs(previous),
-                    1.0
-                )
-            )
-
-        let acceleration =
-            recentGrowth -
-            previousGrowth
-
-        let growthComponent =
-            bounded(
-                max(
-                    recentGrowth,
-                    0.0
-                )
-            )
-
-        let accelerationComponent =
-            bounded(
-                max(
-                    acceleration,
-                    0.0
-                )
-            )
-
-        return bounded(
-            0.70 * growthComponent +
-            0.30 * accelerationComponent
-        )
-    }
-
-    // ========================================================
-    // MARK: - Cellular Automaton Reset
-    // ========================================================
-
-    func resetCells() {
-
-        // Reset deterministic random stream.
-        random =
-            SplitMix64(
-                seed: randomSeed
-            )
-
-        cells.removeAll(
-            keepingCapacity: true
+        var pairs:
+            [(Element, Element)] = []
+
+        pairs.reserveCapacity(
+            count - 1
         )
 
-        let count =
-            gridWidth *
-            gridHeight
+        for index in 0..<(count - 1) {
 
-        guard count > 0 else {
-            yearlyRiskHistory.removeAll()
-            return
-        }
-
-        cells.reserveCapacity(
-            count
-        )
-
-        for _ in 0..<count {
-
-            let energyVariation =
+            pairs.append(
                 (
-                    random.nextUnit() -
-                    0.5
-                ) * 0.10
-
-            let initialEnergy =
-                bounded(
-                    parameters.initialEnergy +
-                    energyVariation
-                )
-
-            cells.append(
-                MarketCell(
-                    energy:
-                        initialEnergy,
-
-                    momentum:
-                        0.0,
-
-                    liquidity:
-                        bounded(
-                            parameters.initialLiquidity
-                        ),
-
-                    capital:
-                        bounded(
-                            parameters.initialCapital
-                        ),
-
-                    exhaustion:
-                        0.0,
-
-                    stress:
-                        0.0,
-
-                    financialPotential:
-                        0.0,
-
-                    contagion:
-                        0.0,
-
-                    dissipation:
-                        0.0,
-
-                    state:
-                        .stable
+                    self[index],
+                    self[index + 1]
                 )
             )
         }
 
-        yearlyRiskHistory.removeAll()
-    }
-
-    // ========================================================
-    // MARK: - Neighbor Indices
-    // ========================================================
-
-    private func neighborIndices(
-        for index: Int
-    ) -> [Int] {
-
-        guard index >= 0,
-              index < cells.count
-        else {
-            return []
-        }
-
-        let x =
-            index % gridWidth
-
-        let y =
-            index / gridWidth
-
-        let directions: [(Int, Int)]
-
-        if parameters.diagonalNeighbors {
-
-            directions = [
-
-                (-1, -1),
-                ( 0, -1),
-                ( 1, -1),
-
-                (-1,  0),
-                ( 1,  0),
-
-                (-1,  1),
-                ( 0,  1),
-                ( 1,  1)
-            ]
-
-        } else {
-
-            directions = [
-
-                ( 0, -1),
-                (-1,  0),
-                ( 1,  0),
-                ( 0,  1)
-            ]
-        }
-
-        var neighbors: [Int] = []
-
-        for (dx, dy) in directions {
-
-            let nx =
-                x + dx
-
-            let ny =
-                y + dy
-
-            guard nx >= 0,
-                  nx < gridWidth,
-                  ny >= 0,
-                  ny < gridHeight
-            else {
-                continue
-            }
-
-            neighbors.append(
-                ny * gridWidth + nx
-            )
-        }
-
-        return neighbors
-    }
-
-    // ========================================================
-    // MARK: - Cellular Automaton Step
-    // ========================================================
-
-    /// Advances exactly one synchronous CA generation.
-    ///
-    /// Every cell reads only from previousCells.
-    func stepCA(
-        equilibriumPressure: Double,
-        volumePressure: Double,
-        scenario: MarketScenario
-    ) {
-
-        guard !cells.isEmpty else {
-            return
-        }
-
-        let previousCells =
-            cells
-
-        // ----------------------------------------------------
-        // 1. System pressures
-        // ----------------------------------------------------
-
-        let normalizedEquilibrium =
-            bounded(
-                equilibriumPressure
-            )
-
-        let normalizedVolume =
-            bounded(
-                volumePressure
-            )
-
-        // ----------------------------------------------------
-        // 2. Macro normalization
-        // ----------------------------------------------------
-
-        // Money supply:
-        // ±20% = strong model range.
-        let moneySupplyForcing =
-            bounded(
-                scenario.moneySupplyChangePercent / 20.0,
-                minimum: -1.0,
-                maximum: 1.0
-            )
-
-        // Inflation:
-        // 10% = strong model range.
-        let inflationForcing =
-            bounded(
-                scenario.inflationPercent / 10.0
-            )
-
-        // Tax growth:
-        // -50%...+50% model range.
-        let taxationForcing =
-            bounded(
-                scenario.taxationPercent / 50.0,
-                minimum: -1.0,
-                maximum: 1.0
-            )
-
-        // Economic growth:
-        // ±15% gives more room than the previous ±10%
-        // historical dataset normalization.
-        let growthForcing =
-            bounded(
-                scenario.economicGrowthPercent / 15.0,
-                minimum: -1.0,
-                maximum: 1.0
-            )
-
-        // Stock growth:
-        // ±60% gives additional room for historical extremes.
-        let stockGrowthForcing =
-            bounded(
-                scenario.stockGrowthPercent / 60.0,
-                minimum: -1.0,
-                maximum: 1.0
-            )
-
-        // ----------------------------------------------------
-        // Stock-growth slowdown
-        // ----------------------------------------------------
-
-        let stockGrowthChange =
-            scenario.stockGrowthPercent -
-            scenario.previousStockGrowthPercent
-
-        let stockGrowthSlowdown =
-            bounded(
-                -stockGrowthChange / 20.0,
-                minimum: -1.0,
-                maximum: 1.0
-            )
-
-        // ----------------------------------------------------
-        // Bond yields
-        // ----------------------------------------------------
-
-        let bondYieldPressure =
-            bounded(
-                scenario.bondYieldAvgPercent / 10.0
-            )
-
-        // ----------------------------------------------------
-        // Banking stress
-        //
-        // Historical JSON uses approximately 0...10.
-        // ----------------------------------------------------
-
-        let bankingStress =
-            bounded(
-                scenario.bankingCreditStressRating / 10.0
-            )
-
-        // ----------------------------------------------------
-        // Monetary policy
-        //
-        // Historical JSON uses approximately -10...+10.
-        // ----------------------------------------------------
-
-        let policyForcing =
-            bounded(
-                scenario.moneyPolicyChangeImpact / 10.0,
-                minimum: -1.0,
-                maximum: 1.0
-            )
-
-        // ----------------------------------------------------
-        // External shock magnitude
-        // ----------------------------------------------------
-
-        let externalShock =
-            bounded(
-                abs(
-                    scenario.externalShockMagnitudePercent
-                ) / 20.0
-            )
-
-        // ----------------------------------------------------
-        // 3. Base market forcing
-        // ----------------------------------------------------
-
-        let externalForcing =
-            bounded(
-                parameters.equilibriumWeight *
-                normalizedEquilibrium
-                +
-                parameters.volumeWeight *
-                normalizedVolume
-            )
-
-        // ----------------------------------------------------
-        // 4. Macro energy
-        // ----------------------------------------------------
-
-        let expansionaryEnergy =
-            max(
-                moneySupplyForcing,
-                0.0
-            ) * 0.30
-            +
-            max(
-                growthForcing,
-                0.0
-            ) * 0.20
-            +
-            max(
-                stockGrowthForcing,
-                0.0
-            ) * 0.10
-            +
-            max(
-                policyForcing,
-                0.0
-            ) * 0.10
-
-        let contractionaryEnergy =
-            max(
-                -moneySupplyForcing,
-                0.0
-            ) * 0.25
-            +
-            inflationForcing * 0.10
-            +
-            max(
-                taxationForcing,
-                0.0
-            ) * 0.10
-            +
-            bondYieldPressure * 0.15
-            +
-            bankingStress * 0.15
-            +
-            externalShock * 0.15
-
-        let macroEnergyForcing =
-            bounded(
-                expansionaryEnergy -
-                contractionaryEnergy,
-                minimum: -1.0,
-                maximum: 1.0
-            )
-
-        // ----------------------------------------------------
-        // 5. Macro momentum
-        // ----------------------------------------------------
-
-        let expansionaryMomentum =
-            moneySupplyForcing * 0.35
-            +
-            growthForcing * 0.20
-            +
-            stockGrowthForcing * 0.20
-            +
-            policyForcing * 0.10
-
-        let contractionaryMomentum =
-            max(
-                stockGrowthSlowdown,
-                0.0
-            ) * 0.20
-            +
-            bondYieldPressure * 0.15
-            +
-            bankingStress * 0.20
-            +
-            externalShock * 0.15
-
-        let macroMomentumForcing =
-            bounded(
-                expansionaryMomentum -
-                contractionaryMomentum,
-                minimum: -1.0,
-                maximum: 1.0
-            )
-
-        // ----------------------------------------------------
-        // 6. Macro stress
-        // ----------------------------------------------------
-
-        let macroStressForcing =
-            bounded(
-                inflationForcing * 0.15
-                +
-                max(
-                    taxationForcing,
-                    0.0
-                ) * 0.10
-                +
-                bondYieldPressure * 0.15
-                +
-                bankingStress * 0.20
-                +
-                max(
-                    stockGrowthSlowdown,
-                    0.0
-                ) * 0.15
-                +
-                externalShock * 0.20
-                +
-                max(
-                    -growthForcing,
-                    0.0
-                ) * 0.10
-            )
-
-        // ====================================================
-        // 7. Synchronous CA update
-        // ====================================================
-
-        for index in previousCells.indices {
-
-            let previous =
-                previousCells[index]
-
-            // ------------------------------------------------
-            // Neighbor field
-            // ------------------------------------------------
-
-            let neighbors =
-                neighborIndices(
-                    for: index
-                )
-
-            let neighborCount =
-                max(
-                    neighbors.count,
-                    1
-                )
-
-            var neighborEnergy = 0.0
-            var neighborMomentum = 0.0
-            var neighborPotential = 0.0
-            var neighborStress = 0.0
-
-            for neighborIndex in neighbors {
-
-                guard neighborIndex >= 0,
-                      neighborIndex < previousCells.count
-                else {
-                    continue
-                }
-
-                let neighbor =
-                    previousCells[
-                        neighborIndex
-                    ]
-
-                neighborEnergy +=
-                    neighbor.energy
-
-                neighborMomentum +=
-                    neighbor.momentum
-
-                neighborPotential +=
-                    neighbor.financialPotential
-
-                neighborStress +=
-                    neighbor.stress
-            }
-
-            neighborEnergy /=
-                Double(neighborCount)
-
-            neighborMomentum /=
-                Double(neighborCount)
-
-            neighborPotential /=
-                Double(neighborCount)
-
-            neighborStress /=
-                Double(neighborCount)
-
-            // ------------------------------------------------
-            // Energy transfer
-            // ------------------------------------------------
-
-            let energyGradient =
-                neighborEnergy -
-                previous.energy
-
-            let energyTransfer =
-                energyGradient *
-                parameters.energyTransferRate
-
-            // ------------------------------------------------
-            // Money supply energy
-            // ------------------------------------------------
-
-            let monetaryEnergy =
-                moneySupplyForcing *
-                parameters.moneySupplyEnergyWeight
-
-            // ------------------------------------------------
-            // Economic growth energy
-            // ------------------------------------------------
-
-            let growthEnergy =
-                growthForcing *
-                parameters.economicGrowthEnergyWeight
-
-            // ------------------------------------------------
-            // External shock energy
-            // ------------------------------------------------
-
-            let disturbanceEnergy =
-                externalShock *
-                parameters.externalShockEnergyWeight
-
-            // ------------------------------------------------
-            // Base injection
-            // ------------------------------------------------
-
-            let baseInjectedEnergy =
-                externalForcing *
-                parameters.energyInjectionRate
-
-            let macroInjectedEnergy =
-                macroEnergyForcing *
-                parameters.macroEnergyInjectionRate
-
-            // ------------------------------------------------
-            // Retained energy
-            // ------------------------------------------------
-
-            let retainedEnergy =
-                previous.energy *
-                parameters.energyRetention
-
-            // ------------------------------------------------
-            // Preliminary energy
-            // ------------------------------------------------
-
-            let preliminaryEnergy =
-                retainedEnergy
-                +
-                baseInjectedEnergy
-                +
-                macroInjectedEnergy
-                +
-                monetaryEnergy
-                +
-                growthEnergy
-                +
-                energyTransfer
-                -
-                disturbanceEnergy
-
-            // ------------------------------------------------
-            // Energy change
-            // ------------------------------------------------
-
-            let directionalChange =
-                preliminaryEnergy -
-                previous.energy
-
-            // ------------------------------------------------
-            // Momentum
-            // ------------------------------------------------
-
-            let preliminaryMomentum =
-                previous.momentum *
-                parameters.momentumRetention
-                +
-                directionalChange *
-                parameters.momentumResponse
-                +
-                macroMomentumForcing *
-                parameters.macroMomentumResponse
-
-            // ------------------------------------------------
-            // Financial potential
-            // ------------------------------------------------
-
-            let energyPotential =
-                bounded(
-                    preliminaryEnergy
-                ) *
-                parameters.potentialEnergyWeight
-
-            let momentumPotential =
-                abs(
-                    preliminaryMomentum
-                ) *
-                parameters.potentialMomentumWeight
-
-            let rawPotential =
-                (
-                    energyPotential +
-                    momentumPotential
-                ) *
-                parameters.potentialGain
-
-            let localPotential =
-                bounded(
-                    rawPotential
-                )
-
-            // ------------------------------------------------
-            // Potential gradient
-            // ------------------------------------------------
-
-            let potentialGradient =
-                neighborPotential -
-                localPotential
-
-            let potentialMomentum =
-                potentialGradient *
-                parameters.potentialGradientResponse
-
-            // ------------------------------------------------
-            // Momentum propagation
-            // ------------------------------------------------
-
-            let momentumGradient =
-                neighborMomentum -
-                previous.momentum
-
-            let newMomentum =
-                preliminaryMomentum
-                +
-                potentialMomentum
-                +
-                momentumGradient *
-                parameters.momentumTransferRate
-
-            // ------------------------------------------------
-            // Liquidity depletion
-            // ------------------------------------------------
-
-            let liquidityPressure =
-                localPotential *
-                parameters.liquidityDepletionRate
-                +
-                inflationForcing *
-                parameters.inflationLiquidityRate
-                +
-                bondYieldPressure *
-                parameters.bondYieldLiquidityRate
-                +
-                bankingStress *
-                parameters.bankingLiquidityRate
-                +
-                max(
-                    taxationForcing,
-                    0.0
-                ) *
-                parameters.taxLiquidityRate
-
-            let newLiquidity =
-                bounded(
-                    previous.liquidity -
-                    liquidityPressure
-                )
-
-            // ------------------------------------------------
-            // Capital depletion
-            // ------------------------------------------------
-
-            let capitalPressure =
-                localPotential *
-                parameters.capitalDepletionRate
-                +
-                max(
-                    taxationForcing,
-                    0.0
-                ) *
-                parameters.taxCapitalRate
-                +
-                bankingStress *
-                parameters.bankingCapitalRate
-                +
-                externalShock *
-                parameters.externalShockCapitalRate
-
-            let newCapital =
-                bounded(
-                    previous.capital -
-                    capitalPressure
-                )
-
-            // ------------------------------------------------
-            // Resource depletion
-            // ------------------------------------------------
-
-            let resourceDepletion =
-                bounded(
-                    1.0 -
-                    (
-                        0.40 * newLiquidity
-                        +
-                        0.40 * newCapital
-                        +
-                        0.20 *
-                        bounded(
-                            preliminaryEnergy
-                        )
-                    )
-                )
-
-            // ------------------------------------------------
-            // Direct energy depletion
-            // ------------------------------------------------
-
-            let energyDepletion =
-                bounded(
-                    1.0 -
-                    bounded(
-                        preliminaryEnergy
-                    )
-                )
-
-            // ------------------------------------------------
-            // Exhaustion
-            // ------------------------------------------------
-
-            let exhaustionPressure =
-                bounded(
-                    resourceDepletion * 0.70
-                    +
-                    energyDepletion * 0.30
-                )
-
-            let recovery =
-                previous.exhaustion *
-                parameters.exhaustionRecoveryRate
-
-            let accumulatedExhaustion =
-                previous.exhaustion
-                -
-                recovery
-                +
-                exhaustionPressure *
-                parameters.exhaustionAccumulationRate
-                +
-                macroStressForcing *
-                parameters.macroExhaustionRate
-
-            let newExhaustion =
-                bounded(
-                    accumulatedExhaustion
-                )
-
-            // ------------------------------------------------
-            // Contagion
-            // ------------------------------------------------
-
-            let stressGradient =
-                neighborStress -
-                previous.stress
-
-            let contagionInput =
-                max(
-                    stressGradient,
-                    0.0
-                )
-                +
-                neighborStress * 0.50
-
-            let newContagion =
-                bounded(
-                    contagionInput *
-                    parameters.contagionRate
-                )
-
-            // ------------------------------------------------
-            // Dissipation
-            // ------------------------------------------------
-
-            let rawDissipation =
-                previous.stress *
-                parameters.dissipationRate
-
-            let newDissipation =
-                bounded(
-                    rawDissipation
-                )
-
-            // ------------------------------------------------
-            // Dissipation removes energy
-            // ------------------------------------------------
-
-            let dissipatedEnergy =
-                newDissipation *
-                parameters.energyDissipationWeight
-
-            let finalEnergy =
-                bounded(
-                    preliminaryEnergy -
-                    dissipatedEnergy
-                )
-
-            // ------------------------------------------------
-            // Final energy depletion
-            // ------------------------------------------------
-
-            let finalEnergyDepletion =
-                bounded(
-                    1.0 -
-                    finalEnergy
-                )
-
-            // ------------------------------------------------
-            // Stress
-            // ------------------------------------------------
-
-            let stressFromEnergy =
-                finalEnergyDepletion *
-                parameters.energyDepletionStressWeight
-
-            let stressFromMomentum =
-                abs(
-                    newMomentum
-                ) *
-                parameters.momentumWeight
-
-            let stressFromPotential =
-                localPotential *
-                parameters.potentialWeight
-
-            let stressFromExhaustion =
-                newExhaustion *
-                parameters.exhaustionWeight
-
-            let stressFromContagion =
-                newContagion *
-                parameters.contagionWeight
-
-            let stressFromMacro =
-                macroStressForcing *
-                parameters.macroStressWeight
-
-            let stressFromExternalForcing =
-                externalForcing *
-                parameters.energyWeight
-
-            let rawStress =
-                stressFromEnergy
-                +
-                stressFromMomentum
-                +
-                stressFromPotential
-                +
-                stressFromExhaustion
-                +
-                stressFromContagion
-                +
-                stressFromMacro
-                +
-                stressFromExternalForcing
-                -
-                newDissipation
-
-            // ------------------------------------------------
-            // Stochastic perturbation
-            // ------------------------------------------------
-
-            let noise =
-                (
-                    random.nextUnit() -
-                    0.5
-                ) *
-                parameters.stochasticNoise
-
-            let newStress =
-                bounded(
-                    rawStress +
-                    noise
-                )
-
-            // ------------------------------------------------
-            // State transition
-            // ------------------------------------------------
-
-            let severeEnergyDepletion =
-                finalEnergy <=
-                parameters.severeEnergyDepletionThreshold
-
-            let newState: MarketState
-
-            if severeEnergyDepletion ||
-                newStress >= parameters.crashedThreshold {
-
-                newState = .crashed
-
-            } else if newStress >=
-                        parameters.criticalThreshold {
-
-                newState = .critical
-
-            } else if newStress >=
-                        parameters.stressedThreshold {
-
-                newState = .stressed
-
-            } else if newStress >=
-                        parameters.risingThreshold {
-
-                newState = .rising
-
-            } else {
-
-                newState = .stable
-            }
-
-            // ------------------------------------------------
-            // Commit
-            // ------------------------------------------------
-
-            cells[index].energy =
-                finalEnergy
-
-            cells[index].momentum =
-                bounded(
-                    newMomentum,
-                    minimum: -1.0,
-                    maximum: 1.0
-                )
-
-            cells[index].financialPotential =
-                localPotential
-
-            cells[index].liquidity =
-                newLiquidity
-
-            cells[index].capital =
-                newCapital
-
-            cells[index].exhaustion =
-                newExhaustion
-
-            cells[index].contagion =
-                newContagion
-
-            cells[index].dissipation =
-                newDissipation
-
-            cells[index].stress =
-                newStress
-
-            cells[index].state =
-                newState
-        }
-    }
-
-    // ========================================================
-    // MARK: - Backward-Compatible stepCA
-    // ========================================================
-
-    /// Retained so existing callers do not break.
-    func stepCA(
-        equilibriumPressure: Double,
-        volumePressure: Double,
-        moneySupplyChangePercent: Double,
-        inflationPercent: Double,
-        taxationPercent: Double,
-        economicGrowthPercent: Double,
-        stockGrowthPercent: Double,
-        previousStockGrowthPercent: Double,
-        bondYieldAvgPercent: Double,
-        bankingCreditStressRating: Double,
-        moneyPolicyChangeImpact: Double,
-        externalShockPercent: Double
-    ) {
-
-        let scenario =
-            MarketScenario(
-                moneySupplyChangePercent:
-                    moneySupplyChangePercent,
-
-                inflationPercent:
-                    inflationPercent,
-
-                taxationPercent:
-                    taxationPercent,
-
-                economicGrowthPercent:
-                    economicGrowthPercent,
-
-                stockGrowthPercent:
-                    stockGrowthPercent,
-
-                previousStockGrowthPercent:
-                    previousStockGrowthPercent,
-
-                bondYieldAvgPercent:
-                    bondYieldAvgPercent,
-
-                bankingCreditStressRating:
-                    bankingCreditStressRating,
-
-                moneyPolicyChangeImpact:
-                    moneyPolicyChangeImpact,
-
-                externalShockMagnitudePercent:
-                    externalShockPercent
-            )
-
-        stepCA(
-            equilibriumPressure:
-                equilibriumPressure,
-            volumePressure:
-                volumePressure,
-            scenario:
-                scenario
-        )
-    }
-
-    // ========================================================
-    // MARK: - State Classification
-    // ========================================================
-
-    private func stateForStress(
-        _ stress: Double
-    ) -> MarketState {
-
-        let value =
-            bounded(stress)
-
-        if value >= parameters.crashedThreshold {
-            return .crashed
-        }
-
-        if value >= parameters.criticalThreshold {
-            return .critical
-        }
-
-        if value >= parameters.stressedThreshold {
-            return .stressed
-        }
-
-        if value >= parameters.risingThreshold {
-            return .rising
-        }
-
-        return .stable
-    }
-
-    // ========================================================
-    // MARK: - Run
-    // ========================================================
-
-    /// Runs the requested number of generations using one
-    /// explicit scenario.
-    func run(
-        years: Int,
-        equilibriumPressure: Double,
-        volumePressure: Double,
-        scenario: MarketScenario
-    ) {
-
-        guard years > 0 else {
-            return
-        }
-
-        for _ in 0..<years {
-
-            stepCA(
-                equilibriumPressure:
-                    equilibriumPressure,
-
-                volumePressure:
-                    volumePressure,
-
-                scenario:
-                    scenario
-            )
-        }
-    }
-
-    /// Backward-compatible run.
-    ///
-    /// Unlike the previous implementation this no longer feeds
-    /// eleven unexplained literal zeroes into stepCA().
-    ///
-    /// A caller that has no macro scenario explicitly receives
-    /// a neutral scenario.
-    func run(
-        years: Int,
-        equilibriumPressure: Double,
-        volumePressure: Double
-    ) {
-
-        run(
-            years:
-                years,
-
-            equilibriumPressure:
-                equilibriumPressure,
-
-            volumePressure:
-                volumePressure,
-
-            scenario:
-                MarketScenario()
-        )
-    }
-
-    // ========================================================
-    // MARK: - Run One Year
-    // ========================================================
-
-    func runYear(
-        year: Int,
-        equilibriumPressure: Double,
-        volumePressure: Double,
-        scenario: MarketScenario
-    ) {
-
-        stepCA(
-            equilibriumPressure:
-                equilibriumPressure,
-
-            volumePressure:
-                volumePressure,
-
-            scenario:
-                scenario
-        )
-
-        let snapshot =
-            makeYearlyRiskSnapshot(
-                year:
-                    year,
-
-                equilibriumPressure:
-                    equilibriumPressure,
-
-                volumePressure:
-                    volumePressure
-            )
-
-        yearlyRiskHistory.append(
-            snapshot
-        )
-    }
-
-    /// Backward-compatible neutral-scenario overload.
-    func runYear(
-        year: Int,
-        equilibriumPressure: Double,
-        volumePressure: Double
-    ) {
-
-        runYear(
-            year:
-                year,
-
-            equilibriumPressure:
-                equilibriumPressure,
-
-            volumePressure:
-                volumePressure,
-
-            scenario:
-                MarketScenario()
-        )
-    }
-
-    // ========================================================
-    // MARK: - Cellular Metrics
-    // ========================================================
-
-    func cellularStress() -> Double {
-
-        guard !cells.isEmpty else {
-            return 0.0
-        }
-
-        let total =
-            cells.reduce(
-                0.0
-            ) {
-                $0 + $1.stress
-            }
-
-        return bounded(
-            total /
-            Double(cells.count)
-        )
-    }
-
-    func averageEnergy() -> Double {
-
-        guard !cells.isEmpty else {
-            return 0.0
-        }
-
-        return bounded(
-            cells.reduce(
-                0.0
-            ) {
-                $0 + $1.energy
-            }
-            /
-            Double(cells.count)
-        )
-    }
-
-    func averageMomentum() -> Double {
-
-        guard !cells.isEmpty else {
-            return 0.0
-        }
-
-        return bounded(
-            cells.reduce(
-                0.0
-            ) {
-                $0 + $1.momentum
-            }
-            /
-            Double(cells.count),
-            minimum: -1.0,
-            maximum: 1.0
-        )
-    }
-
-    func averageFinancialPotential() -> Double {
-
-        guard !cells.isEmpty else {
-            return 0.0
-        }
-
-        return bounded(
-            cells.reduce(
-                0.0
-            ) {
-                $0 + $1.financialPotential
-            }
-            /
-            Double(cells.count)
-        )
-    }
-
-    func averageLiquidity() -> Double {
-
-        guard !cells.isEmpty else {
-            return 0.0
-        }
-
-        return bounded(
-            cells.reduce(
-                0.0
-            ) {
-                $0 + $1.liquidity
-            }
-            /
-            Double(cells.count)
-        )
-    }
-
-    func averageCapital() -> Double {
-
-        guard !cells.isEmpty else {
-            return 0.0
-        }
-
-        return bounded(
-            cells.reduce(
-                0.0
-            ) {
-                $0 + $1.capital
-            }
-            /
-            Double(cells.count)
-        )
-    }
-
-    func averageExhaustion() -> Double {
-
-        guard !cells.isEmpty else {
-            return 0.0
-        }
-
-        return bounded(
-            cells.reduce(
-                0.0
-            ) {
-                $0 + $1.exhaustion
-            }
-            /
-            Double(cells.count)
-        )
-    }
-
-    // ========================================================
-    // MARK: - State Fractions
-    // ========================================================
-
-    /// Only .critical cells.
-    ///
-    /// Crashed cells are deliberately excluded so that the
-    /// critical and crashed populations are mutually exclusive.
-    func criticalCellFraction() -> Double {
-
-        guard !cells.isEmpty else {
-            return 0.0
-        }
-
-        let critical =
-            cells.filter {
-                $0.state == .critical
-            }.count
-
-        return safeDivide(
-            Double(critical),
-            Double(cells.count)
-        )
-    }
-
-    /// Only .crashed cells.
-    func crashCellFraction() -> Double {
-
-        guard !cells.isEmpty else {
-            return 0.0
-        }
-
-        let crashed =
-            cells.filter {
-                $0.state == .crashed
-            }.count
-
-        return safeDivide(
-            Double(crashed),
-            Double(cells.count)
-        )
-    }
-
-    /// Critical + crashed.
-    ///
-    /// This is available separately so callers that want the
-    /// broader distressed population do not overload the meaning
-    /// of criticalCellFraction().
-    func distressedCellFraction() -> Double {
-
-        guard !cells.isEmpty else {
-            return 0.0
-        }
-
-        let distressed =
-            cells.filter {
-                $0.state == .critical ||
-                $0.state == .crashed
-            }.count
-
-        return safeDivide(
-            Double(distressed),
-            Double(cells.count)
-        )
-    }
-
-    // ========================================================
-    // MARK: - Systemic Risk
-    // ========================================================
-
-    func systemicRisk() -> Double {
-
-        let stress =
-            cellularStress()
-
-        let critical =
-            criticalCellFraction()
-
-        let crashed =
-            crashCellFraction()
-
-        let exhaustion =
-            averageExhaustion()
-
-        // These are mutually exclusive state populations.
-        //
-        // 35% average cell stress
-        // 25% critical population
-        // 25% crashed population
-        // 15% exhaustion
-        let risk =
-            0.35 * stress
-            +
-            0.25 * critical
-            +
-            0.25 * crashed
-            +
-            0.15 * exhaustion
-
-        return bounded(risk)
-    }
-
-    func riskLevel() -> MarketState {
-
-        stateForStress(
-            systemicRisk()
-        )
-    }
-
-    // ========================================================
-    // MARK: - Yearly Snapshot
-    // ========================================================
-
-    func makeYearlyRiskSnapshot(
-        year: Int,
-        equilibriumPressure: Double,
-        volumePressure: Double
-    ) -> YearlyRiskSnapshot {
-
-        YearlyRiskSnapshot(
-
-            year:
-                year,
-
-            equilibriumPressure:
-                bounded(
-                    equilibriumPressure
-                ),
-
-            volumePressure:
-                bounded(
-                    volumePressure
-                ),
-
-            averageEnergy:
-                averageEnergy(),
-
-            averageMomentum:
-                averageMomentum(),
-
-            averageFinancialPotential:
-                averageFinancialPotential(),
-
-            averageLiquidity:
-                averageLiquidity(),
-
-            averageCapital:
-                averageCapital(),
-
-            averageExhaustion:
-                averageExhaustion(),
-
-            averageStress:
-                cellularStress(),
-
-            criticalFraction:
-                criticalCellFraction(),
-
-            crashFraction:
-                crashCellFraction(),
-
-            systemicRisk:
-                systemicRisk(),
-
-            riskLevel:
-                riskLevel()
-        )
-    }
-
-    // ========================================================
-    // MARK: - Historical Anchor
-    // ========================================================
-
-    private func historicalCrashIndex(
-        for year: Int
-    ) -> Int? {
-
-        crashRecords.indices.last(
-            where: {
-                crashRecords[$0].year <= year
-            }
-        )
-    }
-
-    // ========================================================
-    // MARK: - Current Analysis
-    // ========================================================
-
-    func analyze(
-        currentYear: Int,
-        currentVolumePoints:
-            [MarketVolumePoint] = []
-    ) -> MarketRiskResult {
-
-        resetCells()
-
-        // ----------------------------------------------------
-        // Historical crash anchor
-        // ----------------------------------------------------
-
-        let historicalIndex =
-            historicalCrashIndex(
-                for:
-                    currentYear
-            )
-
-        let anchorYear =
-            historicalIndex.map {
-                crashRecords[$0].year
-            }
-            ??
-            currentYear
-
-        let yearsSinceCrash =
-            max(
-                currentYear -
-                anchorYear,
-                0
-            )
-
-        // ----------------------------------------------------
-        // Cycle-pressure exponent
-        // ----------------------------------------------------
-
-        let alpha: Double
-
-        if let index =
-            historicalIndex {
-
-            alpha =
-                estimateCyclePressureExponent(
-                    upThroughCrashIndex:
-                        index
-                )
-
-        } else {
-
-            alpha = 2.0
-        }
-
-        // ----------------------------------------------------
-        // Historical intervals
-        // ----------------------------------------------------
-
-        let intervals: [Double]
-
-        if let index =
-            historicalIndex {
-
-            intervals =
-                crashIntervals(
-                    upThroughCrashIndex:
-                        index
-                )
-
-        } else {
-
-            intervals = []
-        }
-
-        // ----------------------------------------------------
-        // Equilibrium pressure
-        // ----------------------------------------------------
-
-        let equilibrium =
-            powerLawPressure(
-                yearsSinceCrash:
-                    yearsSinceCrash,
-
-                alpha:
-                    alpha,
-
-                intervals:
-                    intervals
-            )
-
-        // ----------------------------------------------------
-        // Volume pressure
-        // ----------------------------------------------------
-
-        let volume: Double
-
-        if currentVolumePoints.count >= 3 {
-
-            volume =
-                calculateCurrentVolumePressure(
-                    points:
-                        currentVolumePoints
-                )
-
-        } else {
-
-            volume =
-                historicalVolumePressure(
-                    forYear:
-                        currentYear
-                )
-        }
-
-        // ----------------------------------------------------
-        // IMPORTANT:
-        //
-        // Macro inputs now come from the historical dataset.
-        // ----------------------------------------------------
-
-        let scenario =
-            historicalScenario(
-                for:
-                    currentYear
-            )
-
-        // ----------------------------------------------------
-        // One generation = analyzed year.
-        // ----------------------------------------------------
-
-        runYear(
-            year:
-                currentYear,
-
-            equilibriumPressure:
-                equilibrium,
-
-            volumePressure:
-                volume,
-
-            scenario:
-                scenario
-        )
-
-        // ----------------------------------------------------
-        // Result
-        // ----------------------------------------------------
-
-        return MarketRiskResult(
-
-            year:
-                currentYear,
-
-            equilibriumPressure:
-                equilibrium,
-
-            volumePressure:
-                volume,
-
-            averageEnergy:
-                averageEnergy(),
-
-            averageMomentum:
-                averageMomentum(),
-
-            averageFinancialPotential:
-                averageFinancialPotential(),
-
-            averageLiquidity:
-                averageLiquidity(),
-
-            averageCapital:
-                averageCapital(),
-
-            exhaustion:
-                averageExhaustion(),
-
-            cellularStress:
-                cellularStress(),
-
-            criticalCellFraction:
-                criticalCellFraction(),
-
-            crashCellFraction:
-                crashCellFraction(),
-
-            systemicRisk:
-                systemicRisk(),
-
-            riskLevel:
-                riskLevel()
-        )
-    }
-
-    // ========================================================
-    // MARK: - Historical Crash Analysis
-    // ========================================================
-
-    func analyzeHistoricalCrash(
-        at crashIndex: Int
-    ) -> MarketRiskResult? {
-
-        guard crashIndex >= 0,
-              crashIndex < crashRecords.count
-        else {
-            return nil
-        }
-
-        resetCells()
-
-        let record =
-            crashRecords[crashIndex]
-
-        // ----------------------------------------------------
-        // First crash has no prior crash interval.
-        // ----------------------------------------------------
-
-        guard crashIndex > 0 else {
-
-            return analyze(
-                currentYear:
-                    record.year
-            )
-        }
-
-        let previousRecord =
-            crashRecords[
-                crashIndex - 1
-            ]
-
-        let intervalYears =
-            max(
-                record.year -
-                previousRecord.year,
-                1
-            )
-
-        let alpha =
-            estimateCyclePressureExponent(
-                upThroughCrashIndex:
-                    crashIndex
-            )
-
-        let intervals =
-            crashIntervals(
-                upThroughCrashIndex:
-                    crashIndex
-            )
-
-        // ----------------------------------------------------
-        // Simulate each year separately.
-        //
-        // Each year gets:
-        //
-        // 1. Its own cycle pressure.
-        // 2. Its own historical macro scenario.
-        // 3. Volume information available at that year.
-        //
-        // No terminal crash information is retroactively
-        // applied to every preceding year.
-        // ----------------------------------------------------
-
-        for offset in 1...intervalYears {
-
-            let year =
-                previousRecord.year +
-                offset
-
-            let yearsSinceCrash =
-                max(
-                    year -
-                    previousRecord.year,
-                    0
-                )
-
-            let equilibrium =
-                powerLawPressure(
-                    yearsSinceCrash:
-                        yearsSinceCrash,
-
-                    alpha:
-                        alpha,
-
-                    intervals:
-                        intervals
-                )
-
-            let volume =
-                historicalVolumePressure(
-                    forYear:
-                        year
-                )
-
-            let scenario =
-                historicalScenario(
-                    for:
-                        year
-                )
-
-            runYear(
-                year:
-                    year,
-
-                equilibriumPressure:
-                    equilibrium,
-
-                volumePressure:
-                    volume,
-
-                scenario:
-                    scenario
-            )
-        }
-
-        // ----------------------------------------------------
-        // Terminal pressure
-        // ----------------------------------------------------
-
-        let terminalEquilibrium =
-            powerLawPressure(
-                yearsSinceCrash:
-                    intervalYears,
-
-                alpha:
-                    alpha,
-
-                intervals:
-                    intervals
-            )
-
-        let terminalVolume =
-            historicalVolumePressure(
-                forYear:
-                    record.year
-            )
-
-        return MarketRiskResult(
-
-            year:
-                record.year,
-
-            equilibriumPressure:
-                terminalEquilibrium,
-
-            volumePressure:
-                terminalVolume,
-
-            averageEnergy:
-                averageEnergy(),
-
-            averageMomentum:
-                averageMomentum(),
-
-            averageFinancialPotential:
-                averageFinancialPotential(),
-
-            averageLiquidity:
-                averageLiquidity(),
-
-            averageCapital:
-                averageCapital(),
-
-            exhaustion:
-                averageExhaustion(),
-
-            cellularStress:
-                cellularStress(),
-
-            criticalCellFraction:
-                criticalCellFraction(),
-
-            crashCellFraction:
-                crashCellFraction(),
-
-            systemicRisk:
-                systemicRisk(),
-
-            riskLevel:
-                riskLevel()
-        )
-    }
-
-    // ========================================================
-    // MARK: - Explicit Scenario Analysis
-    // ========================================================
-
-    /// Allows the UI or a controlled experiment to run the CA
-    /// using explicitly supplied macroeconomic values.
-    func analyze(
-        currentYear: Int,
-        volumePressure: Double,
-        scenario: MarketScenario
-    ) -> MarketRiskResult {
-
-        resetCells()
-
-        let historicalIndex =
-            historicalCrashIndex(
-                for:
-                    currentYear
-            )
-
-        let anchorYear =
-            historicalIndex.map {
-                crashRecords[$0].year
-            }
-            ??
-            currentYear
-
-        let yearsSinceCrash =
-            max(
-                currentYear -
-                anchorYear,
-                0
-            )
-
-        let alpha: Double
-
-        let intervals: [Double]
-
-        if let index =
-            historicalIndex {
-
-            alpha =
-                estimateCyclePressureExponent(
-                    upThroughCrashIndex:
-                        index
-                )
-
-            intervals =
-                crashIntervals(
-                    upThroughCrashIndex:
-                        index
-                )
-
-        } else {
-
-            alpha = 2.0
-            intervals = []
-        }
-
-        let equilibrium =
-            powerLawPressure(
-                yearsSinceCrash:
-                    yearsSinceCrash,
-
-                alpha:
-                    alpha,
-
-                intervals:
-                    intervals
-            )
-
-        runYear(
-            year:
-                currentYear,
-
-            equilibriumPressure:
-                equilibrium,
-
-            volumePressure:
-                volumePressure,
-
-            scenario:
-                scenario
-        )
-
-        return MarketRiskResult(
-
-            year:
-                currentYear,
-
-            equilibriumPressure:
-                equilibrium,
-
-            volumePressure:
-                bounded(
-                    volumePressure
-                ),
-
-            averageEnergy:
-                averageEnergy(),
-
-            averageMomentum:
-                averageMomentum(),
-
-            averageFinancialPotential:
-                averageFinancialPotential(),
-
-            averageLiquidity:
-                averageLiquidity(),
-
-            averageCapital:
-                averageCapital(),
-
-            exhaustion:
-                averageExhaustion(),
-
-            cellularStress:
-                cellularStress(),
-
-            criticalCellFraction:
-                criticalCellFraction(),
-
-            crashCellFraction:
-                crashCellFraction(),
-
-            systemicRisk:
-                systemicRisk(),
-
-            riskLevel:
-                riskLevel()
-        )
-    }
-
-    // ========================================================
-    // MARK: - Validation
-    // ========================================================
-
-    func validateCellState() -> Bool {
-
-        for cell in cells {
-
-            guard cell.momentum.isFinite,
-                  cell.momentum >= -1.0,
-                  cell.momentum <= 1.0
-            else {
-                return false
-            }
-
-            let unsignedValues = [
-
-                cell.energy,
-                cell.liquidity,
-                cell.capital,
-                cell.exhaustion,
-                cell.stress,
-                cell.financialPotential,
-                cell.contagion,
-                cell.dissipation
-            ]
-
-            for value in unsignedValues {
-
-                guard value.isFinite,
-                      value >= 0.0,
-                      value <= 1.0
-                else {
-                    return false
-                }
-            }
-
-            // State must agree with the stress thresholds unless
-            // the cell is crashed because of severe energy
-            // depletion.
-            if cell.state != .crashed {
-
-                let expected =
-                    stateForStress(
-                        cell.stress
-                    )
-
-                guard cell.state == expected else {
-                    return false
-                }
-            }
-        }
-
-        return true
-    }
-
-    // ========================================================
-    // MARK: - Historical Causality Validation
-    // ========================================================
-
-    func validateHistoricalCausality(
-        year: Int
-    ) -> Bool {
-
-        guard let selectedIndex =
-                historicalCrashIndex(
-                    for:
-                        year
-                )
-        else {
-
-            // No crash before this year.
-            return crashRecords.allSatisfy {
-                $0.year > year
-            }
-        }
-
-        guard selectedIndex >= 0,
-              selectedIndex < crashRecords.count
-        else {
-            return false
-        }
-
-        // The selected record must be the latest crash that
-        // actually occurred by this year.
-        let expectedIndex =
-            crashRecords.indices.last(
-                where: {
-                    crashRecords[$0].year <= year
-                }
-            )
-
-        return selectedIndex ==
-            expectedIndex
-    }
-
-    // ========================================================
-    // MARK: - Historical Scenario Validation
-    // ========================================================
-
-    /// Confirms that the scenario selected for a year does not
-    /// come from a future historical observation.
-    func validateHistoricalScenarioCausality(
-        year: Int
-    ) -> Bool {
-
-        guard let selected =
-            historicalYears.last(
-                where: {
-                    $0.year <= year
-                }
-            )
-        else {
-            return historicalYears.allSatisfy {
-                $0.year > year
-            }
-        }
-
-        return selected.year <= year
-    }
-
-    // ========================================================
-    // MARK: - Full Model Validation
-    // ========================================================
-
-    func validateModel() -> Bool {
-
-        guard gridWidth > 0,
-              gridHeight > 0
-        else {
-            return false
-        }
-
-        guard !cells.isEmpty else {
-            return false
-        }
-
-        guard validateCellState() else {
-            return false
-        }
-
-        guard validateHistoricalCausality(
-            year:
-                crashRecords.last?.year ?? 0
-        )
-        else {
-            return false
-        }
-
-        return true
+        return pairs
     }
 }
