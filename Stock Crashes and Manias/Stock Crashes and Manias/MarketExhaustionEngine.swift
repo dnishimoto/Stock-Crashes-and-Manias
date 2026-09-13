@@ -1187,59 +1187,165 @@ final class MarketExhaustionEngine {
     // MARK: - Full Current Analysis
     // ========================================================
 
+    @discardableResult
     func analyze(
         currentYear: Int,
-        currentVolumePoints:
-            [MarketVolumePoint] = []
+        currentVolumePoints: [MarketVolumePoint] = []
     ) -> MarketRiskResult {
 
         resetCells()
 
-        let lastCrashYear =
-            crashRecords.last?.year ??
-            currentYear
+        // --------------------------------------------------------
+        // Find the most recent historical crash that existed at
+        // the time being analyzed.
+        //
+        // IMPORTANT:
+        // Never use crashRecords.last for a historical year.
+        // Doing so leaks future information into the analysis.
+        // --------------------------------------------------------
+
+        let historicalCrashIndex: Int? =
+            crashRecords.indices.last(where: {
+                crashRecords[$0].year <= currentYear
+            })
+
+        let historicalCrashYear: Int =
+            historicalCrashIndex.map {
+                crashRecords[$0].year
+            } ?? currentYear
 
         let yearsSinceCrash =
             max(
-                currentYear -
-                lastCrashYear,
+                currentYear - historicalCrashYear,
                 0
             )
 
-        let alpha =
-            estimatePowerLawAlpha()
+        // --------------------------------------------------------
+        // Estimate alpha using ONLY crashes available at the
+        // analysis date.
+        //
+        // This prevents 2008/2020/2022 from influencing a
+        // 1907, 1929, or 1937 analysis.
+        // --------------------------------------------------------
 
-        let equilibrium =
-            powerLawPressure(
-                yearsSinceCrash:
-                    yearsSinceCrash
+        let alpha: Double
+
+        if let crashIndex = historicalCrashIndex {
+            alpha = estimatePowerLawAlpha(
+                upThroughCrashIndex:
+                    crashIndex
             )
+        } else {
+            alpha = 2.0
+        }
 
-        let volume =
-            currentVolumePoints.count >= 3
+        // --------------------------------------------------------
+        // Build the interval history available at this point.
+        // --------------------------------------------------------
 
-            ? calculateCurrentVolumePressure(
-                points:
-                    currentVolumePoints
-            )
+        let intervals: [Double]
 
-            : calculateVolumePressure()
+        if let crashIndex = historicalCrashIndex,
+           crashIndex > 0 {
 
-        // ----------------------------------------------------
-        // Multiple internal generations are treated as one
-        // calendar year.
-        // ----------------------------------------------------
+            intervals =
+                (1...crashIndex)
+                .compactMap { index in
+
+                    let interval =
+                        Double(
+                            crashRecords[index].year -
+                            crashRecords[index - 1].year
+                        )
+
+                    return interval > 0
+                        ? interval
+                        : nil
+                }
+
+        } else {
+            intervals = []
+        }
+
+        // --------------------------------------------------------
+        // Power-law equilibrium pressure.
+        //
+        // This now uses the historical alpha and intervals
+        // available at the requested year.
+        // --------------------------------------------------------
+
+        let equilibrium: Double
+
+        if !intervals.isEmpty {
+
+            equilibrium =
+                powerLawPressure(
+                    yearsSinceCrash:
+                        yearsSinceCrash,
+                    alpha:
+                        alpha,
+                    intervals:
+                        intervals
+                )
+
+        } else {
+
+            equilibrium = 0
+        }
+
+        // --------------------------------------------------------
+        // Volume pressure.
+        //
+        // Current analysis:
+        // use explicitly supplied current volume data.
+        //
+        // Historical analysis:
+        // use the crash record that existed at that time.
+        //
+        // If there is no supplied current series, do NOT fall
+        // through to calculateVolumePressure(), because that
+        // would incorrectly use the final 2022 records.
+        // --------------------------------------------------------
+
+        let volume: Double
+
+        if currentVolumePoints.count >= 3 {
+
+            volume =
+                calculateCurrentVolumePressure(
+                    points:
+                        currentVolumePoints
+                )
+
+        } else if let crashIndex = historicalCrashIndex {
+
+            volume =
+                historicalVolumePressure(
+                    crashIndex:
+                        crashIndex
+                )
+
+        } else {
+
+            volume = 0
+        }
+
+        // --------------------------------------------------------
+        // Run the cellular model for the requested year.
+        // --------------------------------------------------------
 
         _ = runYear(
             year:
                 currentYear,
-
             equilibriumPressure:
                 equilibrium,
-
             volumePressure:
                 volume
         )
+
+        // --------------------------------------------------------
+        // Extract resulting cellular state.
+        // --------------------------------------------------------
 
         let localStress =
             cellularStress()
@@ -1254,7 +1360,6 @@ final class MarketExhaustionEngine {
             systemicRisk(
                 equilibriumPressure:
                     equilibrium,
-
                 volumePressure:
                     volume
             )
@@ -1264,6 +1369,10 @@ final class MarketExhaustionEngine {
                 for:
                     risk
             )
+
+        // --------------------------------------------------------
+        // Return analysis.
+        // --------------------------------------------------------
 
         return MarketRiskResult(
             currentYear:
@@ -1306,7 +1415,6 @@ final class MarketExhaustionEngine {
                 yearlyRiskHistory
         )
     }
-
     // ========================================================
     // MARK: - Historical Crash Analysis
     // ========================================================
