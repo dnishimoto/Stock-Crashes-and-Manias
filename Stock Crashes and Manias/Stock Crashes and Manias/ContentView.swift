@@ -1,4 +1,3 @@
-
 //
 //  ContentView.swift
 //  Stock Crashes and Manias
@@ -39,7 +38,9 @@ struct ContentView: View {
     @State private var crashInterval = 6.0
     @State private var externalShockPercent = 0.0
 
-    // The UI is intentionally based on HistoricalCAResult.
+    // The UI is based on MarketRiskResult, the engine's single
+    // canonical result type shared by current and historical
+    // analysis.
     @State private var result =
         ContentView.defaultResult()
 
@@ -60,7 +61,7 @@ struct ContentView: View {
     private var allCrashResults: [
         (
             period: HistoricalCrashPeriod,
-            result: HistoricalCAResult,
+            result: MarketRiskResult,
             cells: [MarketCell]
         )
     ] {
@@ -137,9 +138,7 @@ struct ContentView: View {
                                 result:
                                     entry.result,
                                 cells:
-                                    entry.cells,
-                                historicalFrames:
-                                    entry.historicalFrames
+                                    entry.cells
                             )
                         }
                     }
@@ -197,8 +196,6 @@ struct ContentView: View {
             .font(.title3.bold())
 
             equilibriumCard
-            energyCard
-            exhaustionCard
             cellularAutomatonCard
             riskCard
         }
@@ -211,9 +208,8 @@ struct ContentView: View {
     @ViewBuilder
     private func historicalCrashPanel(
         analysis: HistoricalAnalysis,
-        result: HistoricalCAResult,
-        cells: [MarketCell],
-        historicalFrames: [HistoricalCAFrame]
+        result: MarketRiskResult,
+        cells: [MarketCell]
     ) -> some View {
 
         VStack(
@@ -257,16 +253,8 @@ struct ContentView: View {
                 result: result
             )
 
-            historicalEnergyCard(
-                result: result
-            )
-
-            historicalExhaustionCard(
-                result: result
-            )
-
             historicalCellularAutomatonCard(
-                result: result
+                cells: cells
             )
 
             historicalRiskCard(
@@ -293,7 +281,7 @@ struct ContentView: View {
 
     private func historicalPowerLawCard(
         analysis: HistoricalAnalysis,
-        result: HistoricalCAResult
+        result: MarketRiskResult
     ) -> some View {
 
         VStack(
@@ -302,7 +290,7 @@ struct ContentView: View {
         ) {
 
             Text(
-                "Financial Gravity & Equilibrium"
+                "Equilibrium & Power Law"
             )
             .font(.headline)
 
@@ -317,10 +305,10 @@ struct ContentView: View {
                 )
 
                 metric(
-                    title: "Inflection",
+                    title: "Volume Pressure",
                     value:
                         percent(
-                            result.equilibriumInflection
+                            result.volumePressure
                         )
                 )
 
@@ -338,68 +326,35 @@ struct ContentView: View {
             HStack {
 
                 metric(
-                    title: "Potential",
+                    title: "Cellular Stress",
                     value:
                         percent(
-                            result.financialPotential
+                            result.cellularStress
                         )
                 )
 
                 metric(
-                    title: "Gradient",
+                    title: "Alpha",
                     value:
-                        percent(
-                            abs(
-                                result.potentialGradient
-                            )
+                        String(
+                            format: "%.2f",
+                            result.alpha
                         )
                 )
 
                 metric(
-                    title: "Contagion",
+                    title: "Years Since Crash",
                     value:
-                        percent(
-                            result.contagion
-                        )
-                )
-            }
-
-            HStack {
-
-                metric(
-                    title: "Policy Force",
-                    value:
-                        percent(
-                            abs(
-                                result.financialPathForce
-                            )
-                        )
-                )
-
-                metric(
-                    title: "Banking Mass",
-                    value:
-                        percent(
-                            result.effectiveFinancialMass
-                        )
-                )
-
-                metric(
-                    title: "Interaction",
-                    value:
-                        percent(
-                            result.bankingPolicyInteraction
-                        )
+                        "\(result.yearsSinceCrash)"
                 )
             }
 
             Text(
-                "The financial-gravity interpretation treats banking and "
-                + "credit fragility as effective financial mass. Policy "
-                + "changes provide directional force, while financial "
-                + "potential creates a resistance field. Neighboring "
-                + "potential differences contribute to contagion and "
-                + "system-wide propagation."
+                "Equilibrium is the point where market expansion begins "
+                + "losing momentum, while volume pressure reflects trading-"
+                + "volume expansion feeding into the cellular automaton. "
+                + "Cellular stress and the power-law alpha describe how "
+                + "close the system is to a critical release."
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -422,224 +377,11 @@ struct ContentView: View {
     }
 
     // ========================================================
-    // MARK: Historical Energy
-    // ========================================================
-
-    private func historicalEnergyCard(
-        result: HistoricalCAResult
-    ) -> some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 10
-        ) {
-
-            Text(
-                "Financial Energy & Path"
-            )
-            .font(.headline)
-
-            HStack {
-
-                metric(
-                    title: "Energy",
-                    value:
-                        percent(
-                            result.finalEnergy
-                        )
-                )
-
-                metric(
-                    title: "Momentum",
-                    value:
-                        percent(
-                            result.finalMomentum
-                        )
-                )
-
-                metric(
-                    title: "Useful Fuel",
-                    value:
-                        percent(
-                            result.usefulFuel
-                        )
-                )
-            }
-
-            Divider()
-
-            HStack {
-
-                metric(
-                    title: "Path Force",
-                    value:
-                        percent(
-                            abs(
-                                result.financialPathForce
-                            )
-                        )
-                )
-
-                metric(
-                    title: "Energy Depletion",
-                    value:
-                        percent(
-                            result.energyDepletion
-                        )
-                )
-
-                metric(
-                    title: "Potential",
-                    value:
-                        percent(
-                            result.financialPotential
-                        )
-                )
-            }
-
-            Text(
-                "Money and credit provide financial energy. "
-                + "Policy direction supplies force along the financial path, "
-                + "while momentum describes the resulting trajectory. "
-                + "Financial potential represents accumulated systemic "
-                + "resistance rather than a direct crash signal."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-        .padding()
-        .background(
-            Color.secondary.opacity(0.06),
-            in: RoundedRectangle(
-                cornerRadius: 12
-            )
-        )
-    }
-
-    // ========================================================
-    // MARK: Historical Exhaustion
-    // ========================================================
-
-    private func historicalExhaustionCard(
-        result: HistoricalCAResult
-    ) -> some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 10
-        ) {
-
-            Text(
-                "Exhaustion & Resistance"
-            )
-            .font(.headline)
-
-            HStack {
-
-                metric(
-                    title: "Mean",
-                    value:
-                        percent(
-                            result.meanExhaustion
-                        )
-                )
-
-                metric(
-                    title: "Local",
-                    value:
-                        percent(
-                            result.localExhaustion
-                        )
-                )
-
-                metric(
-                    title: "Total",
-                    value:
-                        percent(
-                            result.totalExhaustion
-                        )
-                )
-            }
-
-            ProgressView(
-                value:
-                    max(
-                        0,
-                        min(
-                            1,
-                            result.totalExhaustion
-                        )
-                    )
-            )
-
-            HStack {
-
-                metric(
-                    title: "Banking Stress",
-                    value:
-                        percent(
-                            result.bankingStress
-                        )
-                )
-
-                metric(
-                    title: "Financial Mass",
-                    value:
-                        percent(
-                            result.effectiveFinancialMass
-                        )
-                )
-
-                metric(
-                    title: "Attractor",
-                    value:
-                        percent(
-                            result.nonlinearFinancialAttractor
-                        )
-                )
-            }
-
-            HStack {
-
-                Text(
-                    "Exhaustion state"
-                )
-
-                Spacer()
-
-                Text(
-                    exhaustionLabel(
-                        result.totalExhaustion
-                    )
-                )
-                .font(.subheadline.bold())
-            }
-
-            Text(
-                "Exhaustion measures declining ability to convert "
-                + "financial energy into additional momentum. Banking and "
-                + "credit fragility acts as effective financial mass, "
-                + "increasing the system's sensitivity to force, contagion "
-                + "and accumulated financial potential."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-        .padding()
-        .background(
-            Color.secondary.opacity(0.06),
-            in: RoundedRectangle(
-                cornerRadius: 12
-            )
-        )
-    }
-
-    // ========================================================
     // MARK: Historical Cellular Automaton
     // ========================================================
 
     private func historicalCellularAutomatonCard(
-        result: HistoricalCAResult
+        cells: [MarketCell]
     ) -> some View {
 
         VStack(
@@ -675,7 +417,7 @@ struct ContentView: View {
             ) {
 
                 ForEach(
-                    result.cells
+                    cells
                 ) { cell in
 
                     RoundedRectangle(
@@ -736,7 +478,7 @@ struct ContentView: View {
     // ========================================================
 
     private func historicalRiskCard(
-        result: HistoricalCAResult
+        result: MarketRiskResult
     ) -> some View {
 
         VStack(
@@ -752,7 +494,7 @@ struct ContentView: View {
             HStack {
 
                 Text(
-                    "\(result.systemicRisk)"
+                    result.riskLevel
                 )
                 .font(.title3.bold())
                 .foregroundStyle(
@@ -786,10 +528,10 @@ struct ContentView: View {
             HStack {
 
                 metric(
-                    title: "Exhaustion",
+                    title: "Cellular Stress",
                     value:
                         percent(
-                            result.meanExhaustion
+                            result.cellularStress
                         )
                 )
 
@@ -813,36 +555,32 @@ struct ContentView: View {
             HStack {
 
                 metric(
-                    title: "Stress",
+                    title: "Alpha",
                     value:
-                        percent(
-                            result.meanStress
+                        String(
+                            format: "%.2f",
+                            result.alpha
                         )
                 )
 
                 metric(
-                    title: "Potential",
+                    title: "Years Since Crash",
                     value:
-                        percent(
-                            result.financialPotential
-                        )
+                        "\(result.yearsSinceCrash)"
                 )
 
                 metric(
-                    title: "Depletion",
+                    title: "Window",
                     value:
-                        percent(
-                            result.energyDepletion
-                        )
+                        "\(result.predictedWindowStart)–\(result.predictedWindowEnd)"
                 )
             }
 
             Text(
                 "Systemic risk is an emergent cellular-automaton signal "
-                + "derived from exhaustion, stress, critical-cell "
-                + "concentration, crashed cells, energy depletion and "
-                + "financial potential. It is not calculated directly "
-                + "from banking stress or any single historical input."
+                + "derived from cellular stress, critical-cell "
+                + "concentration and crashed cells. It is not calculated "
+                + "directly from any single historical input."
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -869,7 +607,7 @@ struct ContentView: View {
 
     private func historicalYearSummaryCard(
         analysis: HistoricalAnalysis,
-        result: HistoricalCAResult
+        result: MarketRiskResult
     ) -> some View {
 
         VStack(
@@ -886,7 +624,7 @@ struct ContentView: View {
                 "For \(analysis.crashYear), the model combines "
                 + "historical monetary and market expansion with "
                 + "momentum, equilibrium, power-law behavior and "
-                + "cellular exhaustion."
+                + "cellular-automaton risk."
             )
 
             Text(
@@ -895,15 +633,15 @@ struct ContentView: View {
             )
 
             Text(
-                "Energy: \(percent(result.meanEnergy)) • "
-                + "Momentum: \(percent(result.meanMomentum)) • "
-                + "Useful fuel: \(percent(result.usefulFuel))"
+                "Cellular stress: \(percent(result.cellularStress)) • "
+                + "Critical: \(percent(result.criticalFraction)) • "
+                + "Crashed: \(percent(result.crashFraction))"
             )
 
             Text(
-                "Exhaustion: \(percent(result.meanExhaustion)) • "
-                + "Stress: \(percent(result.meanStress)) • "
-                + "Risk: \(percent(result.systemicRisk))"
+                "Systemic risk: \(percent(result.systemicRisk)) "
+                + "(\(result.riskLevel)) • Window: "
+                + "\(result.predictedWindowStart)–\(result.predictedWindowEnd)"
             )
         }
         .font(.footnote)
@@ -985,6 +723,15 @@ struct ContentView: View {
                 "Model Inputs"
             )
             .font(.subheadline.bold())
+
+            Text(
+                "The engine currently derives its analysis from the "
+                + "simulation year and its own historical crash records. "
+                + "The macro inputs below are not yet wired into that "
+                + "calculation."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
 
             scenarioValue(
                 "M2 Growth",
@@ -1127,19 +874,19 @@ struct ContentView: View {
                 )
 
                 metric(
-                    title: "Inflection",
+                    title: "Volume Pressure",
                     value:
                         percent(
-                            result.equilibriumInflection
+                            result.volumePressure
                         )
                 )
             }
 
             Text(
                 "Equilibrium is the model's estimate of the point where "
-                + "market expansion begins losing momentum. It is driven "
-                + "primarily by stock-growth slowdown and inflation pressure; "
-                + "the crash interval is only a weak contributor."
+                + "market expansion begins losing momentum. Volume pressure "
+                + "reflects trading-volume expansion feeding into the "
+                + "cellular automaton alongside it."
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -1396,165 +1143,6 @@ struct ContentView: View {
     }
 
     // ========================================================
-    // MARK: Current Energy
-    // ========================================================
-
-    private var energyCard: some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 8
-        ) {
-
-            Text(
-                "Energy & Momentum"
-            )
-            .font(.headline)
-
-            HStack {
-
-                metric(
-                    title: "Energy",
-                    value:
-                        percent(
-                            result.meanEnergy
-                        )
-                )
-
-                metric(
-                    title: "Momentum",
-                    value:
-                        percent(
-                            result.meanMomentum
-                        )
-                )
-
-                metric(
-                    title: "Useful Fuel",
-                    value:
-                        percent(
-                            result.usefulFuel
-                        )
-                )
-            }
-
-            Text(
-                "Money supply is treated as potential fuel. "
-                + "Fuel becomes useful only when the system can still "
-                + "convert it into momentum."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-        .padding()
-        .background(
-            .thinMaterial,
-            in: RoundedRectangle(
-                cornerRadius: 16
-            )
-        )
-    }
-
-    // ========================================================
-    // MARK: Current Exhaustion
-    // ========================================================
-
-    private var exhaustionCard: some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 10
-        ) {
-
-            Text(
-                "Exhaustion & Financial Resistance"
-            )
-            .font(.headline)
-
-            HStack {
-
-                metric(
-                    title: "Mean",
-                    value:
-                        percent(
-                            result.meanExhaustion
-                        )
-                )
-
-                metric(
-                    title: "Local",
-                    value:
-                        percent(
-                            result.localExhaustion
-                        )
-                )
-
-                metric(
-                    title: "Total",
-                    value:
-                        percent(
-                            result.totalExhaustion
-                        )
-                )
-            }
-
-            ProgressView(
-                value:
-                    max(
-                        0,
-                        min(
-                            1,
-                            result.totalExhaustion
-                        )
-                    )
-            )
-
-            HStack {
-
-                metric(
-                    title: "Banking Mass",
-                    value:
-                        percent(
-                            result.effectiveFinancialMass
-                        )
-                )
-
-                metric(
-                    title: "Potential",
-                    value:
-                        percent(
-                            result.financialPotential
-                        )
-                )
-
-                metric(
-                    title: "Contagion",
-                    value:
-                        percent(
-                            result.contagion
-                        )
-                )
-            }
-
-            Text(
-                "Banking and credit fragility increases effective financial "
-                + "mass. That makes policy force and neighboring financial "
-                + "stress more consequential, increasing exhaustion when the "
-                + "system can no longer efficiently convert energy into momentum."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-        .padding()
-        .background(
-            .thinMaterial,
-            in: RoundedRectangle(
-                cornerRadius: 16
-            )
-        )
-    }
-
-    // ========================================================
     // MARK: Current Cellular Automaton
     // ========================================================
 
@@ -1571,9 +1159,9 @@ struct ContentView: View {
             .font(.headline)
 
             Text(
-                "Each cell carries energy, momentum, equilibrium, "
-                + "exhaustion and stress. Neighboring cells transmit "
-                + "exhaustion through contagion."
+                "Each cell carries a local market state. Neighboring "
+                + "cells transmit stress and exhaustion, driving the "
+                + "critical and crashed fractions shown below."
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -1592,7 +1180,7 @@ struct ContentView: View {
             ) {
 
                 ForEach(
-                    result.cells
+                    engine.cells
                 ) { cell in
 
                     RoundedRectangle(
@@ -1667,9 +1255,7 @@ struct ContentView: View {
             HStack {
 
                 Text(
-                    exhaustionLabel(
-                        result.systemicRisk
-                    )
+                    result.riskLevel
                 )
                 .font(.title.bold())
                 .foregroundStyle(
@@ -1698,6 +1284,57 @@ struct ContentView: View {
                         1.0
                     )
             )
+
+            HStack {
+
+                metric(
+                    title: "Cellular Stress",
+                    value:
+                        percent(
+                            result.cellularStress
+                        )
+                )
+
+                metric(
+                    title: "Critical",
+                    value:
+                        percent(
+                            result.criticalFraction
+                        )
+                )
+
+                metric(
+                    title: "Crashed",
+                    value:
+                        percent(
+                            result.crashFraction
+                        )
+                )
+            }
+
+            HStack {
+
+                metric(
+                    title: "Alpha",
+                    value:
+                        String(
+                            format: "%.2f",
+                            result.alpha
+                        )
+                )
+
+                metric(
+                    title: "Years Since Crash",
+                    value:
+                        "\(result.yearsSinceCrash)"
+                )
+
+                metric(
+                    title: "Window",
+                    value:
+                        "\(result.predictedWindowStart)–\(result.predictedWindowEnd)"
+                )
+            }
 
             Text(
                 "Exploratory cellular-automaton signal. "
@@ -1868,33 +1505,6 @@ struct ContentView: View {
     }
 
     // ========================================================
-    // MARK: Exhaustion Label
-    // ========================================================
-
-    private func exhaustionLabel(
-        _ value: Double
-    ) -> String {
-
-        switch value {
-
-        case 0..<0.25:
-            return "Low"
-
-        case 0.25..<0.50:
-            return "Building"
-
-        case 0.50..<0.75:
-            return "Elevated"
-
-        case 0.75..<0.90:
-            return "Critical"
-
-        default:
-            return "Extreme"
-        }
-    }
-
-    // ========================================================
     // MARK: Percent
     // ========================================================
 
@@ -1914,59 +1524,15 @@ struct ContentView: View {
 
     private func runSimulation() {
 
-        let input =
-            HistoricalCAInput(
-
-                year:
-                    selectedYear,
-
-                growthM2:
-                    growthM2,
-
-                inflationPercent:
-                    inflationPercent,
-
-                taxGrowthPercent:
-                    taxGrowthPercent,
-
-                economicGrowthPercent:
-                    economicGrowthPercent,
-
-                stockGrowthPercent:
-                    stockGrowthPercent,
-
-                previousStockGrowthPercent:
-                    previousStockGrowthPercent,
-
-                growthBondPercent:
-                    bondYieldAvgPercent,
-
-                growthVolumePercent:
-                    growthVolumePercent,
-
-                cyclePressurePercent:
-                    crashInterval,
-
-                shockPressurePercent:
-                    externalShockPercent,
-
-                moneyPolicyChangeImpact:
-                    moneyPolicyChangeImpact,
-
-                bankingCreditStressRating:
-                    bankingCreditStressRating
-            )
-
-        // IMPORTANT:
-        //
-        // This call must return HistoricalCAResult.
-        //
-        // Do not change `result` to MarketRiskResult.
-        // Do not construct a second CA pipeline here.
-        //
+        // The canonical engine now exposes a single
+        // analyze(currentYear:) entry point returning
+        // MarketRiskResult. It no longer accepts the manual
+        // macro inputs below directly — see the note on
+        // scenarioCard.
         result =
             engine.analyze(
-                input: input
+                currentYear:
+                    selectedYear
             )
     }
 
@@ -1990,43 +1556,10 @@ struct ContentView: View {
     // ========================================================
 
     private static func defaultResult()
-        -> HistoricalCAResult {
+        -> MarketRiskResult {
 
-        let engine =
-            MarketExhaustionEngine()
-
-        let input =
-            HistoricalCAInput(
-
-                year: 2026,
-
-                growthM2: 5,
-
-                inflationPercent: 3,
-
-                taxGrowthPercent: 5,
-
-                economicGrowthPercent: 3,
-
-                stockGrowthPercent: 12,
-
-                previousStockGrowthPercent: 20,
-
-                growthBondPercent: 4.5,
-
-                growthVolumePercent: 10,
-
-                cyclePressurePercent: 6,
-
-                shockPressurePercent: 0,
-
-                moneyPolicyChangeImpact: 0.60,
-
-                bankingCreditStressRating: 2.0
-            )
-
-        return engine.analyze(
-            input: input
+        MarketExhaustionEngine().analyze(
+            currentYear: 2026
         )
     }
 }
