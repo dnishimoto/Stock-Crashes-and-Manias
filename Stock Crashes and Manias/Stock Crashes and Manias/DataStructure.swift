@@ -9,6 +9,59 @@ import Foundation
 import SwiftUI
 import Combine
 
+// MARK: - Deterministic Random Generator
+
+struct SplitMix64 {
+
+    private var state: UInt64
+
+    init(seed: UInt64) {
+        self.state = seed
+    }
+
+    mutating func next() -> UInt64 {
+
+        state &+= 0x9E3779B97F4A7C15
+
+        var z = state
+
+        z =
+            (z ^ (z >> 30))
+            &*
+            0xBF58476D1CE4E5B9
+
+        z =
+            (z ^ (z >> 27))
+            &*
+            0x94D049BB133111EB
+
+        return z ^ (z >> 31)
+    }
+
+    mutating func nextUnit() -> Double {
+
+        let value =
+            next()
+
+        let normalized =
+            Double(
+                value >> 11
+            )
+            *
+            (1.0 / 9007199254740992.0)
+
+        return min(
+            max(
+                normalized,
+                0.0
+            ),
+            0.9999999999999999
+        )
+    }
+}
+
+
+
 struct HistoricalCARow: Identifiable {
 
     let id: Int

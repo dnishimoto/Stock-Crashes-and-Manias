@@ -1409,8 +1409,6 @@ struct ContentView: View {
 
     private func runSimulation() {
 
-        // Do not call engine.step(equilibriumPressure:volumePressure:) directly from the view.
-        // Instead, use engine.analyze(currentYear:) which performs a full analysis and updates internal state.
         result =
             engine.analyze(
                 currentYear:
@@ -1441,7 +1439,6 @@ struct ContentView: View {
         -> MarketRiskResult
     {
 
-        // Use engine.analyze(currentYear:) to generate default results.
         MarketExhaustionEngine().analyze(
             currentYear: 2026
         )
@@ -1456,4 +1453,3 @@ struct ContentView: View {
 
     ContentView()
 }
-
