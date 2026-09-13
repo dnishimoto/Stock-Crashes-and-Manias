@@ -40,8 +40,9 @@ struct ContentView: View {
     // MARK: Canonical Results
     // ========================================================
 
- 
     @State private var historicalAnalyses: [HistoricalAnalysis] = []
+
+    @State private var historicalRows: [HistoricalCARow] = []
 
     // One canonical CA engine.
     private let engine = MarketExhaustionEngine()
@@ -73,6 +74,8 @@ struct ContentView: View {
 
                     historicalMatrixCard
 
+                    historicalCrashYearsSection
+
                     modelSummaryCard
                 }
                 .padding()
@@ -84,6 +87,7 @@ struct ContentView: View {
             .onAppear {
 
                 loadHistoricalMatrix()
+                loadHistoricalRows()
 
             }
         }
@@ -593,8 +597,6 @@ struct ContentView: View {
 
         }
     }
-
-  
 
     // ========================================================
     // MARK: Current Cellular Automaton
@@ -1152,8 +1154,6 @@ struct ContentView: View {
         )
     }
 
-  
-  
 
     // ========================================================
     // MARK: Historical Matrix
@@ -1170,7 +1170,49 @@ struct ContentView: View {
             }
     }
 
- 
+    // ========================================================
+    // MARK: Historical Rows (CARow)
+    // ========================================================
+
+    private func loadHistoricalRows() {
+
+        // Use the engine's built-in historical pipeline that decodes JSON,
+        // simulates each crash period, and produces rows.
+        historicalRows = MarketExhaustionEngine().historicalCARows()
+    }
+
+    // ========================================================
+    // MARK: Historical Crash Years Section
+    // ========================================================
+
+    private var historicalCrashYearsSection: some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+
+            Text(
+                "Historical Crash Years"
+            )
+            .font(.title3.bold())
+
+            if historicalRows.isEmpty {
+                Text("No historical data available. If this persists, verify the JSON loads and analyses are computed.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(historicalRows) { row in
+                    historicalCrashPanel(
+                        analysis: row.analysis,
+                        result: row.result,
+                        cells: row.cells
+                    )
+                }
+            }
+        }
+    }
+  
 }
 
 // ============================================================
@@ -1181,3 +1223,4 @@ struct ContentView: View {
 
     ContentView()
 }
+
