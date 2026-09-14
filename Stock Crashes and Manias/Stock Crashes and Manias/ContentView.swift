@@ -194,7 +194,7 @@ struct ContentView: View {
                     title: "Equilibrium",
                     value:
                         percent(
-                            result.equilibriumPressure
+                            analysis.equilibrium
                         )
                 )
 
@@ -1178,7 +1178,7 @@ struct ContentView: View {
 
         // Use the engine's built-in historical pipeline that decodes JSON,
         // simulates each crash period, and produces rows.
-        historicalRows = MarketExhaustionEngine().historicalCARows()
+        historicalRows = engine.historicalCARows()
     }
 
     // ========================================================
