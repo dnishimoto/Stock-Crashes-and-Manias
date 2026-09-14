@@ -1,4 +1,3 @@
-
 //
 //  File.swift
 //  Stock Crashes and Manias
@@ -243,11 +242,7 @@ final class HistoricalMarketEngine {
 
         // ----------------------------------------------------
         // Optimism
-        //
-        // Money growth + stock growth + volume expansion.
-        // Inflation and rates act as counter-pressure.
         // ----------------------------------------------------
-
         let moneySignal =
             normalize(
                 m2Growth,
@@ -283,6 +278,11 @@ final class HistoricalMarketEngine {
                 upper: 15
             )
 
+        let bankingSignal = normalize(bankingCreditStressRating, lower: 0, upper: 10)
+
+        // ----------------------------------------------------
+        // Optimism
+        // ----------------------------------------------------
         let optimism =
             clamp(
                 0.40 * moneySignal +
@@ -324,6 +324,7 @@ final class HistoricalMarketEngine {
         // Money + stock activity establish the expansion.
         // Equilibrium increases as marginal momentum weakens
         // under increasing pressure.
+        // Banking stress is now included as a direct term.
         // ----------------------------------------------------
 
         let cycleIntervalSignal =
@@ -339,7 +340,8 @@ final class HistoricalMarketEngine {
                 0.25 * inflationSignal +
                 0.15 * bondSignal +
                 0.10 * volumeSignal +
-                0.05 * cycleIntervalSignal
+                0.05 * cycleIntervalSignal +
+                0.10 * bankingSignal
             )
 
         // ----------------------------------------------------
