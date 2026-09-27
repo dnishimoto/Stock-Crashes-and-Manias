@@ -285,12 +285,14 @@ struct MarketVolumePoint:
 }
 
 
-// ============================================================
-// MARK: - Market Cell
-// ============================================================
 
 struct MarketCell: Identifiable {
+
     let id: Int
+
+    // --------------------------------------------------------
+    // Dynamic market state
+    // --------------------------------------------------------
 
     var energy: Double
     var liquidity: Double
@@ -310,11 +312,58 @@ struct MarketCell: Identifiable {
     var contagion: Double
     var stress: Double
 
-    // New nonlinear / precursor fields
+    // --------------------------------------------------------
+    // Persistent heterogeneous characteristics
+    // --------------------------------------------------------
+
+    /// Local liquidity reserve.
+    ///
+    /// Higher values allow the cell to absorb temporary
+    /// liquidity pressure before entering a severe state.
+    var liquidityBuffer: Double
+
+    /// Local capital reserve.
+    ///
+    /// Higher values allow the cell to absorb losses before
+    /// becoming unstable.
+    var capitalBuffer: Double
+
+    /// Structural fragility / leverage.
+    ///
+    /// Higher values make the cell more sensitive to stress,
+    /// depletion and contagion.
+    var fragility: Double
+
+    /// Exposure to the macroeconomic environment.
+    ///
+    /// Higher values cause macro shocks to affect the cell
+    /// more strongly.
+    var macroExposure: Double
+
+    /// Ability of the cell to recover from accumulated stress.
+    ///
+    /// Higher values accelerate recovery.
+    var recoveryCapacity: Double
+
+    /// Sensitivity to local random or externally transmitted
+    /// shocks.
+    ///
+    /// Higher values make the cell more likely to become an
+    /// early failure point.
+    var localShockSusceptibility: Double
+
+    // --------------------------------------------------------
+    // Nonlinear / precursor fields
+    // --------------------------------------------------------
+
     var equilibriumDistance: Double
     var equilibriumCompression: Double
     var nonlinearAmplification: Double
     var localInstability: Double
+
+    // --------------------------------------------------------
+    // Canonical state
+    // --------------------------------------------------------
 
     var state: MarketState
 }
@@ -329,21 +378,63 @@ struct MarketCell: Identifiable {
 // CAParameters has been removed.
 // All cellular and macroeconomic coefficients live here.
 //
+struct HistoricalCrashPeriod: Codable, Identifiable {
+    let id: Int
 
-struct MarketParameters:
-    Codable,
-    Equatable
-{
+    /// Year in which the major crash occurred.
+    let crashYear: Int
 
-    // --------------------------------------------------------
-    // Simulation
-    // --------------------------------------------------------
+    /// Human-readable name for the historical event.
+    let name: String
 
+    /// Years of historical data used to build the pre-crash stress trajectory.
+    let years: [HistoricalYear]
+}
+
+struct MarketParameters: Codable, Equatable {
+
+    // MARK: - Persistent Cell Heterogeneity
+
+    /// Baseline liquidity buffer for each cell.
+    var baseLiquidityBuffer: Double = 1.0
+
+    /// Random variation around the baseline liquidity buffer.
+    var liquidityBufferVariation: Double = 0.20
+
+    /// Baseline capital buffer for each cell.
+    var baseCapitalBuffer: Double = 1.0
+
+    /// Random variation around the baseline capital buffer.
+    var capitalBufferVariation: Double = 0.15
+
+    /// Baseline structural fragility / leverage.
+    var baseFragility: Double = 0.50
+
+    /// Random variation in structural fragility.
+    var fragilityVariation: Double = 0.25
+
+    /// Baseline exposure to macroeconomic stress.
+    var baseMacroExposure: Double = 0.50
+
+    /// Random variation in macroeconomic exposure.
+    var macroExposureVariation: Double = 0.20
+
+    /// Baseline ability of a cell to recover from stress.
+    var baseRecoveryCapacity: Double = 0.50
+
+    /// Random variation in recovery capacity.
+    var recoveryCapacityVariation: Double = 0.20
+
+    /// Baseline susceptibility to local shocks.
+    var baseLocalShockSusceptibility: Double = 0.50
+
+    /// Random variation in local-shock susceptibility.
+    var localShockSusceptibilityVariation: Double = 0.25
+
+    
     var gridWidth: Int = 32
     var gridHeight: Int = 32
-
     var generationsPerYear: Int = 1
-
     var randomSeed: UInt64 = 42
 
 
@@ -365,8 +456,8 @@ struct MarketParameters:
 
     var energyInjectionRate: Double = 0.20
 
-    /// Fraction of injected model energy converted into
-    /// usable cellular energy.
+    /// Fraction of injected model energy converted into usable
+    /// cellular energy.
     var energyConversion: Double = 0.30
 
     var energyRetention: Double = 0.90
@@ -391,11 +482,8 @@ struct MarketParameters:
 
     var momentumRetention: Double = 0.85
     var momentumResponse: Double = 0.25
-
     var macroMomentumResponse: Double = 0.20
-
     var potentialGradientResponse: Double = 0.20
-
     var momentumTransferRate: Double = 0.15
 
 
@@ -404,13 +492,14 @@ struct MarketParameters:
     // --------------------------------------------------------
 
     var potentialGain: Double = 0.75
-
     var potentialEnergyWeight: Double = 0.60
     var potentialMomentumWeight: Double = 0.40
+
 
     // --------------------------------------------------------
     // Equilibrium / nonlinear transition
     // --------------------------------------------------------
+
     /// Strength of attraction toward the local market equilibrium.
     var equilibriumAttractionRate: Double = 0.18
 
@@ -455,6 +544,9 @@ struct MarketParameters:
     var liquidityDepletionRate: Double = 0.08
     var capitalDepletionRate: Double = 0.06
 
+    /// Variation applied when initializing a cell's liquidity
+    /// shock-absorption buffer.
+
     var inflationLiquidityRate: Double = 0.10
     var bondYieldLiquidityRate: Double = 0.10
     var bankingLiquidityRate: Double = 0.15
@@ -471,7 +563,6 @@ struct MarketParameters:
 
     var exhaustionRecoveryRate: Double = 0.02
     var exhaustionAccumulationRate: Double = 0.35
-
     var macroExhaustionRate: Double = 0.15
 
 
@@ -526,8 +617,44 @@ struct MarketParameters:
     var systemicStressWeight: Double = 0.30
     var systemicCriticalWeight: Double = 0.20
     var systemicCrashWeight: Double = 0.15
-}
 
+
+    // --------------------------------------------------------
+    // Systemic-risk thresholds
+    // --------------------------------------------------------
+
+    var lowRiskThreshold: Double = 0.25
+    var moderateRiskThreshold: Double = 0.50
+    var highRiskThreshold: Double = 0.75
+    var extremeRiskThreshold: Double = 0.90
+
+
+    // --------------------------------------------------------
+    // Cellular stress / instability
+    // --------------------------------------------------------
+
+    var cellularStressThreshold: Double = 0.50
+    var cellularCriticalStressThreshold: Double = 0.75
+
+    var stressedCellFractionThreshold: Double = 0.35
+    var crashedCellFractionThreshold: Double = 0.15
+
+    var neighborStressTransferRate: Double = 0.20
+    var cellularStressRecoveryRate: Double = 0.05
+
+
+    // --------------------------------------------------------
+    // Crash / recovery dynamics
+    // --------------------------------------------------------
+
+    var crashAccelerationRate: Double = 0.25
+    var crashEnergyLossRate: Double = 0.40
+    var crashLiquidityLossRate: Double = 0.35
+    var crashCapitalLossRate: Double = 0.30
+
+    var crashRecoveryRate: Double = 0.03
+    var crashDurationGenerations: Int = 8
+}
 
 
 
@@ -656,6 +783,7 @@ struct MarketRiskResult:
 
     let systemicRisk: Double
     let riskLevel: MarketState
+    let cellularStress: Double
 }
 
 
@@ -666,20 +794,6 @@ struct MarketRiskResult:
 struct HistoricalJSONRoot: Codable {
 
     let crashPeriods: [HistoricalCrashPeriod]
-}
-
-
-struct HistoricalCrashPeriod:
-    Codable,
-    Identifiable
-{
-
-    var id: Int {
-        crashYear
-    }
-
-    let crashYear: Int
-    let priorYears: [HistoricalYear]
 }
 
 
@@ -768,6 +882,8 @@ struct HistoricalCrashAnalysis:
 
     let result: MarketRiskResult
     let cells: [MarketCell]
+    
+    let cellularStress: Double
 }
 
 
@@ -1506,4 +1622,3 @@ let historicalMarketJSON = """
   ]
 }
 """
-

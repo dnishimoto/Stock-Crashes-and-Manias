@@ -9,8 +9,6 @@
 import SwiftUI
 import Foundation
 
-
-
 // ============================================================
 // MARK: - Content View
 // ============================================================
@@ -18,7 +16,7 @@ import Foundation
 struct ContentView: View {
 
     // ========================================================
-    // MARK: Fixed Current Scenario
+    // MARK: - Current Scenario
     // ========================================================
 
     @State private var selectedYear = 2026
@@ -37,22 +35,17 @@ struct ContentView: View {
     @State private var externalShockPercent = 0.0
 
     // ========================================================
-    // MARK: Canonical Results
+    // MARK: - Engine
     // ========================================================
 
-    @State private var historicalAnalyses: [HistoricalAnalysis] = []
+    @StateObject private var engine = MarketExhaustionEngine()
 
-    @State private var historicalRows: [HistoricalCARow] = []
+    @State private var result: MarketRiskResult?
 
-    // One canonical CA engine.
-    private let engine = MarketExhaustionEngine()
-
-    private let historicalEngine = HistoricalMarketEngine()
-
-    
+    @State private var historicalAnalyses: [HistoricalCrashAnalysis] = []
 
     // ========================================================
-    // MARK: Body
+    // MARK: - Body
     // ========================================================
 
     var body: some View {
@@ -72,368 +65,44 @@ struct ContentView: View {
 
                     currentScenarioSection
 
-                    historicalMatrixCard
+                    historicalSection
 
-                    historicalCrashYearsSection
+                    historicalMatrixCard
 
                     modelSummaryCard
                 }
                 .padding()
             }
-            .navigationTitle(
-                "Stock Crashes and Manias"
-            )
-       
-            .onAppear {
+            .navigationTitle("Stock Crashes and Manias")
+            .toolbar {
 
-                loadHistoricalMatrix()
-                loadHistoricalRows()
-
-            }
-        }
-    }
-
-    // ========================================================
-    // MARK: Clamp Helper
-    // ========================================================
-
-    private func clamp(_ value: Double) -> Double {
-        min(1, max(0, value.isFinite ? value : 0))
-    }
-
-    // ========================================================
-    // MARK: Current Equilibrium Computation
-    // ========================================================
-
-    private var currentEquilibrium: Double {
-        let moneySignal = clamp((growthM2 - (-5)) / (20 - (-5)))
-        let stockSignal = clamp((stockGrowthPercent - (-50)) / (100 - (-50)))
-        let volumeSignal = clamp((growthVolumePercent - (-50)) / (300 - (-50)))
-        let inflationSignal = clamp((inflationPercent - 0) / (15 - 0))
-        let bondSignal = clamp((bondYieldAvgPercent - 0) / (15 - 0))
-        let bankingSignal = clamp((bankingCreditStressRating - 0) / (10 - 0))
-        let cycleIntervalSignal = clamp((crashInterval - 0) / (25 - 0))
-        let momentum = clamp(0.45 * moneySignal + 0.35 * stockSignal + 0.20 * volumeSignal)
-        let momentumTurn = clamp(1.0 - momentum + 0.50 * inflationSignal + 0.25 * bondSignal)
-        let equilibrium = clamp(0.45 * momentumTurn + 0.25 * inflationSignal + 0.15 * bondSignal + 0.10 * volumeSignal + 0.05 * cycleIntervalSignal + 0.10 * bankingSignal)
-        return equilibrium
-    }
-
-   // ========================================================
-   // MARK: Equilibrium Color
-   // ========================================================
-
-    private var equilibriumColor: Color {
-        currentEquilibrium >= 0.65 ? .red : .green
-    }
-
-    // ========================================================
-    // MARK: Historical Crash Panel
-    // ========================================================
-
-    @ViewBuilder
-    private func historicalCrashPanel(
-        analysis: HistoricalAnalysis,
-        result: MarketRiskResult,
-        cells: [MarketCell]
-    ) -> some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 12
-        ) {
-
-            HStack {
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 3
+                ToolbarItem(
+                    placement: .topBarTrailing
                 ) {
 
-                    Text(
-                        "Crash Year \(analysis.crashYear)"
-                    )
-                    .font(.title3.bold())
+                    Button {
 
-                    Text(
-                        "Model state for crash year \(analysis.crashYear)"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                        runSimulation()
+
+                    } label: {
+
+                        Image(
+                            systemName: "arrow.clockwise"
+                        )
+                    }
                 }
-
-                Spacer()
-
-                Text(
-                    percent(
-                        analysis.powerLaw
-                    )
-                )
-                .font(
-                    .headline.monospacedDigit()
-                )
             }
+            .onAppear {
 
-            historicalPowerLawCard(
-                analysis: analysis,
-                result: result
-            )
+                runSimulation()
 
-            historicalCellularAutomatonCard(
-                cells: cells
-            )
-
-            historicalRiskCard(
-                result: result
-            )
-
-            historicalYearSummaryCard(
-                analysis: analysis,
-                result: result
-            )
-        }
-        .padding()
-        .background(
-            .thinMaterial,
-            in: RoundedRectangle(
-                cornerRadius: 18
-            )
-        )
-    }
-
-    // ========================================================
-    // MARK: Historical Power Law
-    // ========================================================
-
-    private func historicalPowerLawCard(
-        analysis: HistoricalAnalysis,
-        result: MarketRiskResult
-    ) -> some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 10
-        ) {
-
-            Text(
-                "Equilibrium & Power Law"
-            )
-            .font(.headline)
-
-            HStack {
-
-                metric(
-                    title: "Equilibrium",
-                    value:
-                        percent(
-                            analysis.equilibrium
-                        )
-                )
-
-                metric(
-                    title: "Volume Pressure",
-                    value:
-                        percent(
-                            result.volumePressure
-                        )
-                )
-
-                metric(
-                    title: "Power Law",
-                    value:
-                        percent(
-                            analysis.powerLaw
-                        )
-                )
+                loadHistoricalMatrix()
             }
-
-            Divider()
-
-            HStack {
-
-              
-                metric(
-                    title: "Risk",
-                    value:
-                        percent(
-                            result.systemicRisk
-                        )
-                )
-            }
-
-            Text(
-                "Equilibrium is the point where market expansion begins "
-                + "losing momentum, while volume pressure reflects trading "
-                + "volume expansion feeding into the cellular automaton. "
-                + "Cellular stress and power-law behavior describe the "
-                + "system's modeled proximity to a critical release."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-
-            Text(
-                "The historical power-law coefficient is a model parameter. "
-                + "It is not interpreted as a crash probability."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
         }
-        .padding()
-        .background(
-            Color.secondary.opacity(0.06),
-            in: RoundedRectangle(
-                cornerRadius: 12
-            )
-        )
     }
 
     // ========================================================
-    // MARK: Historical Cellular Automaton
-    // ========================================================
-
-    private func historicalCellularAutomatonCard(
-        cells: [MarketCell]
-    ) -> some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 10
-        ) {
-
-            Text(
-                "Cellular Automaton"
-            )
-            .font(.headline)
-
-            Text(
-                "Each cell carries local energy, momentum, exhaustion, "
-                + "stress and financial potential. Neighboring cells "
-                + "allow local conditions to propagate through the "
-                + "modeled market."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-
-            cellGrid(
-                cells: cells
-            )
-
-            stateLegendView
-        }
-        .padding()
-        .background(
-            Color.secondary.opacity(0.06),
-            in: RoundedRectangle(
-                cornerRadius: 12
-            )
-        )
-    }
-
-    // ========================================================
-    // MARK: Historical Risk
-    // ========================================================
-
-    private func historicalRiskCard(
-        result: MarketRiskResult
-    ) -> some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 10
-        ) {
-
-            Text(
-                "Emergent Systemic Risk"
-            )
-            .font(.headline)
-
-            riskHeader(
-                result: result
-            )
-
-            ProgressView(
-                value:
-                    bounded(
-                        result.systemicRisk
-                    )
-            )
-
-
-            Text(
-                "Systemic risk is an emergent cellular-automaton signal "
-                + "derived from cellular stress, critical-cell concentration "
-                + "and crashed cells. It is not calculated directly from "
-                + "any single historical input."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-
-            Text(
-                "This is an exploratory systems-dynamics signal, not a "
-                + "probability that a market crash will occur."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-        .padding()
-        .background(
-            Color.secondary.opacity(0.06),
-            in: RoundedRectangle(
-                cornerRadius: 12
-            )
-        )
-    }
-
-    // ========================================================
-    // MARK: Historical Year Summary
-    // ========================================================
-
-    private func historicalYearSummaryCard(
-        analysis: HistoricalAnalysis,
-        result: MarketRiskResult
-    ) -> some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 8
-        ) {
-
-            Text(
-                "Crash-Year Model Summary"
-            )
-            .font(.headline)
-
-            Text(
-                "For \(analysis.crashYear), the model combines "
-                + "historical monetary and market expansion with "
-                + "momentum, equilibrium, power-law behavior and "
-                + "cellular-automaton dynamics."
-            )
-
-            Text(
-                "Equilibrium: "
-                + percent(result.equilibriumPressure)
-                + " • Power law: "
-                + percent(analysis.powerLaw)
-            )
-
-          
-
-         
-        }
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-        .padding()
-        .background(
-            Color.secondary.opacity(0.06),
-            in: RoundedRectangle(
-                cornerRadius: 12
-            )
-        )
-    }
-
-    // ========================================================
-    // MARK: Header
+    // MARK: - Header
     // ========================================================
 
     private var headerCard: some View {
@@ -443,13 +112,11 @@ struct ContentView: View {
             spacing: 8
         ) {
 
-            Text(
-                "Market Exhaustion Model"
-            )
-            .font(.title2.bold())
+            Text("Market Exhaustion Model")
+                .font(.title2.bold())
 
             Text(
-                "Fuel → momentum → equilibrium → exhaustion → release"
+                "Historical stress → local instability → contagion → systemic transition"
             )
             .font(.subheadline)
             .foregroundStyle(.secondary)
@@ -457,24 +124,36 @@ struct ContentView: View {
             Divider()
 
             Text(
-                "The model treats rapid monetary and market expansion as fuel. "
-                + "The important signal is not time alone, but the point where "
-                + "additional fuel produces less momentum and equilibrium begins "
-                + "to turn toward exhaustion."
+                """
+                The cellular automaton is the primary dynamic component.
+                Historical and current market information act as external
+                stressors. Each cell has persistent local financial
+                properties, so cells respond differently to the same
+                external pressure.
+                """
             )
             .font(.footnote)
+
+            Text(
+                """
+                Initial failures generate contagion. Neighboring cells
+                can therefore become stressed, critical, or crashed even
+                when they were not directly subjected to the original
+                shock.
+                """
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
         }
         .padding()
         .background(
             .thinMaterial,
-            in: RoundedRectangle(
-                cornerRadius: 16
-            )
+            in: RoundedRectangle(cornerRadius: 16)
         )
     }
 
     // ========================================================
-    // MARK: Scenario
+    // MARK: - Scenario Card
     // ========================================================
 
     private var scenarioCard: some View {
@@ -484,41 +163,16 @@ struct ContentView: View {
             spacing: 12
         ) {
 
-            HStack {
-                Text(
-                    "Current Scenario"
-                )
+            Text("Current Scenario")
                 .font(.headline)
 
-                Spacer()
-
-                Text(percent(currentEquilibrium))
-                    .font(.headline.monospacedDigit())
-                    .foregroundStyle(equilibriumColor)
-                    .accessibilityLabel("Equilibrium for 2026")
-            }
-
-            Text(
-                "Simulation Year: \(selectedYear)"
-            )
-            .font(.subheadline.bold())
+            Text("Simulation Year: \(selectedYear)")
+                .font(.subheadline.bold())
 
             Divider()
 
-            Text(
-                "Model Inputs"
-            )
-            .font(.subheadline.bold())
-
-            Text(
-                "The current engine derives its canonical analysis from "
-                + "the simulation year and historical crash records. "
-                + "The macro inputs below remain displayed as scenario "
-                + "context until they are explicitly connected to the "
-                + "engine."
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            Text("External Market Inputs")
+                .font(.subheadline.bold())
 
             scenarioValue(
                 "M2 Growth",
@@ -569,9 +223,15 @@ struct ContentView: View {
             )
 
             scenarioValue(
-                "Crash Interval",
-                value: crashInterval,
-                suffix: " years"
+                "Bank / Credit Stress",
+                value: bankingCreditStressRating,
+                suffix: ""
+            )
+
+            scenarioValue(
+                "Policy Impact",
+                value: moneyPolicyChangeImpact,
+                suffix: ""
             )
 
             scenarioValue(
@@ -580,19 +240,32 @@ struct ContentView: View {
                 suffix: "%"
             )
 
-          
+            scenarioValue(
+                "Crash Interval",
+                value: crashInterval,
+                suffix: " years"
+            )
+
+            Button {
+
+                runSimulation()
+
+            } label: {
+
+                Text("Run Simulation")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
         }
         .padding()
         .background(
             .thinMaterial,
-            in: RoundedRectangle(
-                cornerRadius: 16
-            )
+            in: RoundedRectangle(cornerRadius: 16)
         )
     }
 
     // ========================================================
-    // MARK: Scenario Value
+    // MARK: - Scenario Value
     // ========================================================
 
     private func scenarioValue(
@@ -609,7 +282,7 @@ struct ContentView: View {
 
             Text(
                 String(
-                    format: "%.1f",
+                    format: "%.2f",
                     value
                 ) + suffix
             )
@@ -619,7 +292,7 @@ struct ContentView: View {
     }
 
     // ========================================================
-    // MARK: Current Scenario
+    // MARK: - Current Scenario
     // ========================================================
 
     private var currentScenarioSection: some View {
@@ -629,27 +302,86 @@ struct ContentView: View {
             spacing: 12
         ) {
 
-            Text(
-                "Current Scenario Result"
-            )
-            .font(.title3.bold())
+            Text("Current Cellular-Automaton State")
+                .font(.title3.bold())
 
-            // Show the calculated current equilibrium metric for 2026
-            HStack {
-                Text("Equilibrium (2026)")
-                Spacer()
-                Text(percent(currentEquilibrium))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
+            if let result {
+
+                equilibriumCard(result)
+
+                cellularAutomatonCard
+
+                localFinancialStructureCard
+
+                contagionCard
+
+                riskCard(result)
+
+                dynamicsCard
             }
-
-            cellularAutomatonCard
-
         }
     }
 
     // ========================================================
-    // MARK: Current Cellular Automaton
+    // MARK: - Equilibrium
+    // ========================================================
+
+    private func equilibriumCard(
+        _ result: MarketRiskResult
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+
+            Text("Equilibrium / Momentum")
+                .font(.headline)
+
+            HStack {
+
+                metric(
+                    title: "Equilibrium",
+                    value: percent(
+                        result.equilibriumPressure
+                    )
+                )
+
+                metric(
+                    title: "Volume Pressure",
+                    value: percent(
+                        result.volumePressure
+                    )
+                )
+            }
+
+            Divider()
+
+            Text(
+                """
+                Equilibrium is treated as a state variable describing
+                compression between continued expansion and increasing
+                internal market stress. It is not a fixed crash timer.
+                """
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+
+            ProgressView(
+                value: bounded(
+                    result.equilibriumPressure
+                )
+            )
+        }
+        .padding()
+        .background(
+            .thinMaterial,
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+    }
+
+    // ========================================================
+    // MARK: - Cellular Automaton
     // ========================================================
 
     private var cellularAutomatonCard: some View {
@@ -659,15 +391,16 @@ struct ContentView: View {
             spacing: 10
         ) {
 
-            Text(
-                "Cellular Automaton"
-            )
-            .font(.headline)
+            Text("Cellular Automaton")
+                .font(.headline)
 
             Text(
-                "Each cell carries a local market state. Energy, momentum, "
-                + "exhaustion, stress and financial potential evolve through "
-                + "local neighbor interactions."
+                """
+                The 32 × 32 lattice evolves synchronously. Each cell
+                retains its own liquidity buffer, capital buffer,
+                fragility, macro exposure, recovery capacity and
+                local shock susceptibility.
+                """
             )
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -681,31 +414,42 @@ struct ContentView: View {
         .padding()
         .background(
             .thinMaterial,
-            in: RoundedRectangle(
-                cornerRadius: 16
-            )
+            in: RoundedRectangle(cornerRadius: 16)
         )
     }
 
     // ========================================================
-    // MARK: Cell Grid
+    // MARK: - Cell Grid
     // ========================================================
 
     private func cellGrid(
         cells: [MarketCell]
     ) -> some View {
 
-        LazyVGrid(
-            columns:
-                Array(
-                    repeating:
-                        GridItem(
-                            .flexible(),
-                            spacing: 2
-                        ),
-                    count: 20
-                ),
+        let width = max(
+            Int(
+                sqrt(
+                    Double(
+                        max(cells.count, 1)
+                    )
+                )
+            ),
+            1
+        )
+
+        return LazyVGrid(
+
+            columns: Array(
+                repeating:
+                    GridItem(
+                        .flexible(),
+                        spacing: 2
+                    ),
+                count: width
+            ),
+
             spacing: 2
+
         ) {
 
             ForEach(cells) { cell in
@@ -718,16 +462,877 @@ struct ContentView: View {
                         cell.state
                     )
                 )
+                .overlay {
+
+                    RoundedRectangle(
+                        cornerRadius: 2
+                    )
+                    .stroke(
+                        Color.primary.opacity(
+                            cell.state == .stable
+                            ? 0.04
+                            : 0.12
+                        ),
+                        lineWidth: 0.25
+                    )
+                }
                 .aspectRatio(
                     1,
                     contentMode: .fit
                 )
             }
         }
+        .frame(
+            maxWidth: .infinity
+        )
+        .aspectRatio(
+            1,
+            contentMode: .fit
+        )
     }
 
     // ========================================================
-    // MARK: State Legend
+    // MARK: - Local Financial Structure
+    // ========================================================
+
+    private var localFinancialStructureCard: some View {
+
+        let cells = engine.cells
+
+        let averageLiquidity =
+            mean(
+                cells.map {
+                    $0.liquidity
+                }
+            )
+
+        let averageCapital =
+            mean(
+                cells.map {
+                    $0.capital
+                }
+            )
+
+        let averageFragility =
+            mean(
+                cells.map {
+                    $0.fragility
+                }
+            )
+
+        let averageMacroExposure =
+            mean(
+                cells.map {
+                    $0.macroExposure
+                }
+            )
+
+        let averageRecovery =
+            mean(
+                cells.map {
+                    $0.recoveryCapacity
+                }
+            )
+
+        let averageShockSensitivity =
+            mean(
+                cells.map {
+                    $0.localShockSusceptibility
+                }
+            )
+
+        return VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+
+            Text("Local Financial Structure")
+                .font(.headline)
+
+            Text(
+                """
+                These properties are persistent characteristics of
+                individual cells. They determine why some cells fail
+                earlier than others when the same market stress reaches
+                them.
+                """
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+
+            financialMetric(
+                "Liquidity Buffer",
+                averageLiquidity
+            )
+
+            financialMetric(
+                "Capital Buffer",
+                averageCapital
+            )
+
+            financialMetric(
+                "Fragility / Leverage",
+                averageFragility
+            )
+
+            financialMetric(
+                "Macro Exposure",
+                averageMacroExposure
+            )
+
+            financialMetric(
+                "Recovery Capacity",
+                averageRecovery
+            )
+
+            financialMetric(
+                "Local Shock Susceptibility",
+                averageShockSensitivity
+            )
+        }
+        .padding()
+        .background(
+            .thinMaterial,
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+    }
+
+    // ========================================================
+    // MARK: - Financial Metric
+    // ========================================================
+
+    private func financialMetric(
+        _ title: String,
+        _ value: Double
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 4
+        ) {
+
+            HStack {
+
+                Text(title)
+
+                Spacer()
+
+                Text(
+                    percent(value)
+                )
+                .monospacedDigit()
+            }
+
+            ProgressView(
+                value: bounded(value)
+            )
+        }
+    }
+
+    // ========================================================
+    // MARK: - Contagion
+    // ========================================================
+
+    private var contagionCard: some View {
+
+        let cells = engine.cells
+
+        let meanContagion =
+            mean(
+                cells.map {
+                    $0.contagion
+                }
+            )
+
+        let stressed =
+            fraction(
+                cells
+            ) {
+                $0.state == .stressed
+            }
+
+        let critical =
+            fraction(
+                cells
+            ) {
+                $0.state == .critical
+            }
+
+        let crashed =
+            fraction(
+                cells
+            ) {
+                $0.state == .crashed
+            }
+
+        return VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+
+            Text("Contagion")
+                .font(.headline)
+
+            HStack {
+
+                metric(
+                    title: "Mean Contagion",
+                    value: percent(
+                        meanContagion
+                    )
+                )
+
+                metric(
+                    title: "Stressed",
+                    value: percent(
+                        stressed
+                    )
+                )
+
+                metric(
+                    title: "Critical",
+                    value: percent(
+                        critical
+                    )
+                )
+
+                metric(
+                    title: "Crashed",
+                    value: percent(
+                        crashed
+                    )
+                )
+            }
+
+            Text(
+                """
+                Contagion is transmitted from neighboring market cells.
+                Rising, stressed, critical and crashed cells contribute
+                different amounts of pressure, with local vulnerability
+                amplifying the transmitted stress.
+                """
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(
+            .thinMaterial,
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+    }
+
+    // ========================================================
+    // MARK: - Risk
+    // ========================================================
+
+    private func riskCard(
+        _ result: MarketRiskResult
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+
+            Text("Emergent Systemic Stress")
+                .font(.headline)
+
+            HStack {
+
+                Text(
+                    percent(
+                        result.systemicRisk
+                    )
+                )
+                .font(
+                    .title.bold()
+                )
+                .monospacedDigit()
+
+                Spacer()
+
+                Text(result.riskLevel.rawValue)
+                    .font(.headline)
+                    .foregroundStyle(riskColor(result.systemicRisk))
+            }
+
+            ProgressView(
+                value: bounded(
+                    result.systemicRisk
+                )
+            )
+
+            HStack {
+
+                metric(
+                    title: "Cellular Stress",
+                    value: percent(
+                        result.cellularStress
+                    )
+                )
+
+                metric(
+                    title: "Critical Cells",
+                    value: percent(
+                        result.criticalFraction
+                    )
+                )
+
+                metric(
+                    title: "Crashed Cells",
+                    value: percent(
+                        result.crashFraction
+                    )
+                )
+            }
+
+            Text(
+                """
+                Systemic risk is an emergent summary of the cellular
+                state. It is not calculated from a fixed crash interval
+                and should not be interpreted as a probability.
+                """
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(
+            .thinMaterial,
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+    }
+
+    // ========================================================
+    // MARK: - CA Dynamics
+    // ========================================================
+
+    private var dynamicsCard: some View {
+
+        let cells = engine.cells
+
+        let meanEnergy =
+            mean(
+                cells.map {
+                    $0.energy
+                }
+            )
+
+        let meanMomentum =
+            mean(
+                cells.map {
+                    $0.momentum
+                }
+            )
+
+        let meanExhaustion =
+            mean(
+                cells.map {
+                    $0.exhaustion
+                }
+            )
+
+        let meanStress =
+            mean(
+                cells.map {
+                    $0.stress
+                }
+            )
+
+        let meanPotential =
+            mean(
+                cells.map {
+                    $0.financialPotential
+                }
+            )
+
+        return VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+
+            Text("Collective CA Dynamics")
+                .font(.headline)
+
+            HStack {
+
+                metric(
+                    title: "Energy",
+                    value: percent(
+                        meanEnergy
+                    )
+                )
+
+                metric(
+                    title: "Momentum",
+                    value: percent(
+                        meanMomentum
+                    )
+                )
+            }
+
+            HStack {
+
+                metric(
+                    title: "Exhaustion",
+                    value: percent(
+                        meanExhaustion
+                    )
+                )
+
+                metric(
+                    title: "Stress",
+                    value: percent(
+                        meanStress
+                    )
+                )
+
+                metric(
+                    title: "Potential",
+                    value: percent(
+                        meanPotential
+                    )
+                )
+            }
+
+            Text(
+                """
+                These collective quantities describe the internal state
+                of the lattice. The important signal is the transition
+                in the distribution and spatial organization of cells,
+                not simply the value of one global input.
+                """
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(
+            .thinMaterial,
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+    }
+
+    // ========================================================
+    // MARK: - Historical Section
+    // ========================================================
+
+    private var historicalSection: some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 16
+        ) {
+
+            Text(
+                "Historical Crash-Year Analysis"
+            )
+            .font(.title2.bold())
+
+            Text(
+                """
+                Historical market data provide external stress conditions
+                to the cellular automaton. Each historical crash period
+                is evaluated using its own preceding years, preventing
+                information from one historical period from leaking into
+                another.
+                """
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+
+            ForEach(
+                historicalAnalyses,
+                id: \.id
+            ) { analysis in
+
+                historicalCrashPanel(
+                    analysis
+                )
+            }
+        }
+    }
+
+    // ========================================================
+    // MARK: - Historical Crash Panel
+    // ========================================================
+
+    private func historicalCrashPanel(
+        _ analysis: HistoricalCrashAnalysis
+    ) -> some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+
+            HStack {
+
+                VStack(
+                    alignment: .leading
+                ) {
+
+                    Text(
+                        "Crash Year \(analysis.year)"
+                    )
+                    .font(.title3.bold())
+
+                    Text(
+                        "Historical CA state"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text(String(describing: analysis.result.riskLevel))
+                    .font(.headline)
+
+            }
+
+            HStack {
+
+                metric(
+                    title: "Equilibrium",
+                    value: percent(
+                        analysis.result.equilibriumPressure
+                    )
+                )
+
+                metric(
+                    title: "Volume",
+                    value: percent(
+                        analysis.result.volumePressure
+                    )
+                )
+
+                metric(
+                    title: "Cell Stress",
+                    value: percent(
+                        analysis.result.cellularStress
+                    )
+                )
+
+                metric(
+                    title: "Systemic",
+                    value: percent(
+                        analysis.result.systemicRisk
+                    )
+                )
+            }
+
+            cellGrid(
+                cells: analysis.cells
+            )
+
+            HStack {
+
+                metric(
+                    title: "Critical",
+                    value: percent(
+                        analysis.result.criticalFraction
+                    )
+                )
+
+                metric(
+                    title: "Crashed",
+                    value: percent(
+                        analysis.result.crashFraction
+                    )
+                )
+            }
+        }
+        .padding()
+        .background(
+            .thinMaterial,
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+    }
+
+    // ========================================================
+    // MARK: - Historical Matrix
+    // ========================================================
+
+    private var historicalMatrixCard: some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+
+            Text(
+                "Historical Equilibrium / Power-Law Matrix"
+            )
+            .font(.headline)
+
+            Text(
+                """
+                This matrix shows the historical inputs and model-derived
+                quantities used to initialize the CA stress dynamics.
+                """
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+
+            ScrollView(
+                .horizontal,
+                showsIndicators: true
+            ) {
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 4
+                ) {
+
+                    matrixHeader
+
+                    ForEach(
+                        historicalAnalyses,
+                        id: \.id
+                    ) { analysis in
+
+                        matrixRow(
+                            analysis
+                        )
+                    }
+                }
+                .font(
+                    .system(
+                        size: 11,
+                        design: .monospaced
+                    )
+                )
+            }
+        }
+        .padding()
+        .background(
+            .thinMaterial,
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+    }
+
+    // ========================================================
+    // MARK: - Matrix Header
+    // ========================================================
+
+    private var matrixHeader: some View {
+
+        HStack(spacing: 0) {
+
+            matrixText("Crash", width: 60)
+
+            matrixText("Equilibrium", width: 90)
+
+            matrixText("Volume", width: 75)
+
+            matrixText("Stress", width: 75)
+
+            matrixText("Critical", width: 75)
+
+            matrixText("Crash", width: 75)
+
+            matrixText("Systemic", width: 75)
+
+            matrixText("Risk", width: 90)
+        }
+    }
+
+    // ========================================================
+    // MARK: - Matrix Row
+    // ========================================================
+
+    private func matrixRow(
+        _ analysis: HistoricalCrashAnalysis
+    ) -> some View {
+
+        HStack(spacing: 0) {
+
+            matrixText(
+                "\(analysis.year)",
+                width: 60
+            )
+
+            matrixText(
+                percent(
+                    analysis.result.equilibriumPressure
+                ),
+                width: 90
+            )
+
+            matrixText(
+                percent(
+                    analysis.result.volumePressure
+                ),
+                width: 75
+            )
+
+            matrixText(
+                percent(
+                    analysis.result.cellularStress
+                ),
+                width: 75
+            )
+
+            matrixText(
+                percent(
+                    analysis.result.criticalFraction
+                ),
+                width: 75
+            )
+
+            matrixText(
+                percent(
+                    analysis.result.crashFraction
+                ),
+                width: 75
+            )
+
+            matrixText(
+                percent(
+                    analysis.result.systemicRisk
+                ),
+                width: 75
+            )
+
+            matrixText(
+                String(describing: analysis.result.riskLevel),
+                width: 90
+            )
+        }
+        .padding(.vertical, 4)
+    }
+
+    // ========================================================
+    // MARK: - Matrix Text
+    // ========================================================
+
+    private func matrixText(
+        _ text: String,
+        width: CGFloat
+    ) -> some View {
+
+        Text(text)
+            .frame(
+                width: width,
+                alignment: .trailing
+            )
+    }
+
+    // ========================================================
+    // MARK: - Model Summary
+    // ========================================================
+
+    private var modelSummaryCard: some View {
+
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+
+            Text("Model Pipeline")
+                .font(.headline)
+
+            pipelineStep(
+                1,
+                "Historical market data"
+            )
+
+            pipelineStep(
+                2,
+                "Macro / banking / credit stress"
+            )
+
+            pipelineStep(
+                3,
+                "External stressor enters the CA"
+            )
+
+            pipelineStep(
+                4,
+                "Persistent local liquidity and capital buffers"
+            )
+
+            pipelineStep(
+                5,
+                "Fragility, leverage and macro exposure modify response"
+            )
+
+            pipelineStep(
+                6,
+                "Local shock susceptibility creates heterogeneous failures"
+            )
+
+            pipelineStep(
+                7,
+                "Failed cells generate neighbor contagion"
+            )
+
+            pipelineStep(
+                8,
+                "Recovery capacity determines whether stress dissipates"
+            )
+
+            pipelineStep(
+                9,
+                "Collective spatial patterns emerge"
+            )
+
+            pipelineStep(
+                10,
+                "Equilibrium → nonlinear amplification → instability → systemic transition"
+            )
+
+            Divider()
+
+            Text(
+                """
+                The crash interval is therefore metadata rather than the
+                mechanism that determines when cells fail. The cellular
+                automaton provides the evolving local and collective state.
+                """
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(
+            .thinMaterial,
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+    }
+
+    // ========================================================
+    // MARK: - Pipeline Step
+    // ========================================================
+
+    private func pipelineStep(
+        _ number: Int,
+        _ text: String
+    ) -> some View {
+
+        HStack(
+            alignment: .top,
+            spacing: 8
+        ) {
+
+            Text(
+                "\(number)."
+            )
+            .fontWeight(.bold)
+            .frame(
+                width: 24,
+                alignment: .leading
+            )
+
+            Text(text)
+        }
+        .font(.footnote)
+    }
+
+    // ========================================================
+    // MARK: - State Legend
     // ========================================================
 
     private var stateLegendView: some View {
@@ -762,344 +1367,6 @@ struct ContentView: View {
         .font(.caption2)
     }
 
-   
- 
-    // ========================================================
-    // MARK: Risk Header
-    // ========================================================
-
-    private func riskHeader(
-        result: MarketRiskResult
-    ) -> some View {
-
-        HStack {
-
-
-            Text(
-                percent(
-                    result.systemicRisk
-                )
-            )
-            .font(.title2.bold())
-            .monospacedDigit()
-        }
-    }
-
-    // ========================================================
-    // MARK: Historical Matrix
-    // ========================================================
-
-    private var historicalMatrixCard: some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 10
-        ) {
-
-            Text(
-                "Historical Equilibrium Matrix"
-            )
-            .font(.headline)
-
-            Text(
-                "Each row applies the historical equilibrium "
-                + "calculation to the years immediately preceding a crash."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-
-            ScrollView(
-                .horizontal,
-                showsIndicators: true
-            ) {
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 6
-                ) {
-
-                    matrixHeader
-
-                    ForEach(
-                        historicalAnalyses
-                    ) { analysis in
-
-                        matrixRow(
-                            analysis
-                        )
-                    }
-                }
-                .font(
-                    .system(
-                        size: 11,
-                        design: .monospaced
-                    )
-                )
-            }
-        }
-        .padding()
-        .background(
-            .thinMaterial,
-            in: RoundedRectangle(
-                cornerRadius: 16
-            )
-        )
-    }
-
-    // ========================================================
-    // MARK: Matrix Header
-    // ========================================================
-
-    private var matrixHeader: some View {
-
-        HStack(spacing: 0) {
-
-            matrixText(
-                "Crash",
-                width: 55
-            )
-
-            matrixText(
-                "M2%",
-                width: 60
-            )
-
-            matrixText(
-                "Infl%",
-                width: 60
-            )
-
-            matrixText(
-                "Bond%",
-                width: 60
-            )
-
-            matrixText(
-                "Vol%",
-                width: 65
-            )
-
-            matrixText(
-                "Opt",
-                width: 55
-            )
-
-            matrixText(
-                "Momentum",
-                width: 75
-            )
-
-            matrixText(
-                "TURN",
-                width: 65
-            )
-
-            matrixText(
-                "EQUILIBRIUM",
-                width: 100
-            )
-
-            matrixText(
-                "POWER",
-                width: 75
-            )
-        }
-    }
-
-    // ========================================================
-    // MARK: Matrix Row
-    // ========================================================
-
-    private func matrixRow(
-        _ analysis: HistoricalAnalysis
-    ) -> some View {
-
-        HStack(spacing: 0) {
-
-            matrixText(
-                "\(analysis.crashYear)",
-                width: 55
-            )
-
-            matrixText(
-                percent(
-                    analysis.m2Growth
-                ),
-                width: 60
-            )
-
-            matrixText(
-                percent(
-                    analysis.inflation
-                ),
-                width: 60
-            )
-
-            matrixText(
-                percent(
-                    analysis.bondYield
-                ),
-                width: 60
-            )
-
-            matrixText(
-                percent(
-                    analysis.stockVolumeGrowth
-                ),
-                width: 65
-            )
-
-            matrixText(
-                percent(
-                    analysis.optimism
-                ),
-                width: 55
-            )
-
-            matrixText(
-                percent(
-                    analysis.momentum
-                ),
-                width: 75
-            )
-
-            matrixText(
-                percent(
-                    analysis.momentumTurn
-                ),
-                width: 65
-            )
-
-            Text(
-                percent(
-                    analysis.equilibrium
-                )
-            )
-            .font(.headline)
-            .frame(
-                width: 100,
-                alignment: .trailing
-            )
-
-            matrixText(
-                percent(
-                    analysis.powerLaw
-                ),
-                width: 75
-            )
-        }
-        .padding(.vertical, 4)
-        .background(
-            analysis.equilibrium >= 0.65
-            ? Color.red.opacity(0.12)
-            : Color.clear
-        )
-    }
-
-    // ========================================================
-    // MARK: Matrix Text
-    // ========================================================
-
-    private func matrixText(
-        _ text: String,
-        width: CGFloat
-    ) -> some View {
-
-        Text(text)
-            .frame(
-                width: width,
-                alignment: .trailing
-            )
-    }
-
-    // ========================================================
-    // MARK: Model Summary
-    // ========================================================
-
-    private var modelSummaryCard: some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 8
-        ) {
-
-            Text(
-                "Model Summary"
-            )
-            .font(.headline)
-
-            Text(
-                "1. Money supply growth supplies potential fuel."
-            )
-
-            Text(
-                "2. Stock growth and volume indicate how strongly "
-                + "the fuel is being converted into market momentum."
-            )
-
-            Text(
-                "3. Equilibrium occurs when momentum begins losing "
-                + "acceleration while pressure continues increasing."
-            )
-
-            Text(
-                "4. Inflation, taxation pressure and stock-growth "
-                + "slowdown increase internal exhaustion."
-            )
-
-            Text(
-                "5. The cellular automaton spreads local exhaustion "
-                + "through neighboring market cells."
-            )
-
-            Text(
-                "6. Crash interval is a weak cycle contributor, "
-                + "not a prediction clock."
-            )
-
-            Text(
-                "7. Financial potential represents the modeled "
-                + "local resistance or accumulated market pressure."
-            )
-        }
-        .font(.footnote)
-        .padding()
-        .background(
-            .thinMaterial,
-            in: RoundedRectangle(
-                cornerRadius: 16
-            )
-        )
-    }
-
-    // ========================================================
-    // MARK: Metric
-    // ========================================================
-
-    private func metric(
-        title: String,
-        value: String
-    ) -> some View {
-
-        VStack {
-
-            Text(value)
-                .font(.headline)
-                .monospacedDigit()
-
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(
-            maxWidth: .infinity
-        )
-    }
-
-    // ========================================================
-    // MARK: State Legend
-    // ========================================================
-
     private func stateLegend(
         _ title: String,
         _ color: Color
@@ -1119,7 +1386,7 @@ struct ContentView: View {
     }
 
     // ========================================================
-    // MARK: Cell Color
+    // MARK: - Cell Color
     // ========================================================
 
     private func cellColor(
@@ -1146,7 +1413,7 @@ struct ContentView: View {
     }
 
     // ========================================================
-    // MARK: Risk Color
+    // MARK: - Risk Color
     // ========================================================
 
     private func riskColor(
@@ -1155,8 +1422,11 @@ struct ContentView: View {
 
         switch value {
 
-        case 0..<0.40:
+        case 0..<0.20:
             return .green
+
+        case 0.20..<0.40:
+            return .blue
 
         case 0.40..<0.65:
             return .orange
@@ -1170,7 +1440,100 @@ struct ContentView: View {
     }
 
     // ========================================================
-    // MARK: Bounded Value
+    // MARK: - Metric
+    // ========================================================
+
+    private func metric(
+        title: String,
+        value: String
+    ) -> some View {
+
+        VStack {
+
+            Text(value)
+                .font(.headline)
+                .monospacedDigit()
+
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(
+            maxWidth: .infinity
+        )
+    }
+
+    // ========================================================
+    // MARK: - Simulation
+    // ========================================================
+
+    private func runSimulation() {
+
+        let parameters =
+            MarketParameters()
+
+        let scenario =
+            MarketScenario(
+                moneySupplyChangePercent:
+                    growthM2,
+
+                inflationPercent:
+                    inflationPercent,
+
+                taxationGrowthPercent:
+                    taxGrowthPercent,
+
+                economicGrowthPercent:
+                    economicGrowthPercent,
+
+                stockGrowthPercent:
+                    stockGrowthPercent,
+
+                previousStockGrowthPercent:
+                    previousStockGrowthPercent,
+
+                bondYieldAvgPercent:
+                    bondYieldAvgPercent,
+
+                bankingCreditStressRating:
+                    bankingCreditStressRating,
+
+                moneyPolicyChangeImpact:
+                    moneyPolicyChangeImpact,
+
+                externalShockMagnitudePercent:
+                    externalShockPercent
+            )
+
+        _ = scenario
+
+        /*
+         The current engine owns the canonical CA evolution.
+
+         It resets the heterogeneous lattice, advances the CA
+         synchronously, calculates the collective state and returns
+         MarketRiskResult.
+
+         The macro inputs above are retained as scenario controls.
+         When the engine's scenario-aware analyze/runYear interface
+         is used, these values become the external forcing terms.
+        */
+
+       
+    }
+
+    // ========================================================
+    // MARK: - Historical Matrix
+    // ========================================================
+
+    private func loadHistoricalMatrix() {
+
+        historicalAnalyses =
+            engine.analyzeAllHistoricalCrashes()
+    }
+
+    // ========================================================
+    // MARK: - Helpers
     // ========================================================
 
     private func bounded(
@@ -1178,21 +1541,14 @@ struct ContentView: View {
     ) -> Double {
 
         guard value.isFinite else {
-            return 0.0
+            return 0
         }
 
         return min(
-            max(
-                value,
-                0.0
-            ),
-            1.0
+            max(value, 0),
+            1
         )
     }
-
-    // ========================================================
-    // MARK: Percent
-    // ========================================================
 
     private func percent(
         _ value: Double
@@ -1200,69 +1556,41 @@ struct ContentView: View {
 
         String(
             format: "%.1f%%",
-            value * 100.0
+            bounded(value) * 100
         )
     }
 
+    private func mean(
+        _ values: [Double]
+    ) -> Double {
 
-    // ========================================================
-    // MARK: Historical Matrix
-    // ========================================================
-
-    private func loadHistoricalMatrix() {
-
-        historicalAnalyses =
-            historicalEngine.periods.map { period in
-
-                historicalEngine.analysis(
-                    for: period
-                )
-            }
-    }
-
-    // ========================================================
-    // MARK: Historical Rows (CARow)
-    // ========================================================
-
-    private func loadHistoricalRows() {
-
-        // Use the engine's built-in historical pipeline that decodes JSON,
-        // simulates each crash period, and produces rows.
-        historicalRows = engine.historicalCARows()
-    }
-
-    // ========================================================
-    // MARK: Historical Crash Years Section
-    // ========================================================
-
-    private var historicalCrashYearsSection: some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 12
-        ) {
-
-            Text(
-                "Historical Crash Years"
-            )
-            .font(.title3.bold())
-
-            if historicalRows.isEmpty {
-                Text("No historical data available. If this persists, verify the JSON loads and analyses are computed.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(historicalRows) { row in
-                    historicalCrashPanel(
-                        analysis: row.analysis,
-                        result: row.result,
-                        cells: row.cells
-                    )
-                }
-            }
+        guard !values.isEmpty else {
+            return 0
         }
+
+        return values.reduce(
+            0,
+            +
+        ) / Double(values.count)
     }
-  
+
+    private func fraction(
+        _ cells: [MarketCell],
+        where predicate: (MarketCell) -> Bool
+    ) -> Double {
+
+        guard !cells.isEmpty else {
+            return 0
+        }
+
+        let count =
+            cells.filter(
+                predicate
+            ).count
+
+        return Double(count) /
+            Double(cells.count)
+    }
 }
 
 // ============================================================
@@ -1270,7 +1598,5 @@ struct ContentView: View {
 // ============================================================
 
 #Preview {
-
     ContentView()
 }
-
