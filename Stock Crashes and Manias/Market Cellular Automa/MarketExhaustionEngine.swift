@@ -1591,16 +1591,16 @@ final class MarketExhaustionEngine: ObservableObject {
     // ========================================================
 
     private static func decodeHistoricalData(_ json: String) -> HistoricalJSONRoot {
-        guard let data = json.data(using: .utf8) else {
-            return HistoricalJSONRoot(crashPeriods: [])
+            guard let data = json.data(using: .utf8) else {
+                return HistoricalJSONRoot(crashPeriods: [])
+            }
+            do {
+                return try JSONDecoder().decode(HistoricalJSONRoot.self, from: data)
+            } catch {
+                assertionFailure("Historical market JSON failed to decode: \(error)")
+                return HistoricalJSONRoot(crashPeriods: [])
+            }
         }
-        do {
-            return try JSONDecoder().decode(HistoricalJSONRoot.self, from: data)
-        } catch {
-            assertionFailure("Historical market JSON failed to decode: \(error)")
-            return HistoricalJSONRoot(crashPeriods: [])
-        }
-    }
 }
 
 // ============================================================

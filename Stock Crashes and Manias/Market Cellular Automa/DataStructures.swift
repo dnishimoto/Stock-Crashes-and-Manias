@@ -162,7 +162,12 @@ struct MarketScenario:
 // HistoricalCARow
 // ============================================================
 
-struct HistoricalCARow {
+struct HistoricalCARow: Identifiable {
+
+    var id: Int {
+        period.crashYear
+    }
+
 
     let period: HistoricalCrashPeriod
 
@@ -423,23 +428,64 @@ struct MarketCell: Identifiable {
 // CAParameters has been removed.
 // All cellular and macroeconomic coefficients live here.
 //
-struct HistoricalCrashPeriod: Codable {
+struct HistoricalCrashPeriod: Codable, Identifiable {
 
     /// Year in which the major crash occurred.
     let crashYear: Int
 
     /// Human-readable name for the historical event.
+    ///
+    /// The embedded JSON does not carry a name, so it is optional
+    /// on decode and defaults to "Crash <year>".
     let name: String
 
+    /// Years of historical data used to build the pre-crash stress trajectory.
+    /// (Matches the "priorYears" key in the historical JSON.)
+    let priorYears: [HistoricalYear]
 
-       /// Years of historical data used to build the pre-crash stress trajectory.
-       /// (Matches the "priorYears" key in the historical JSON.)
-       let priorYears: [HistoricalYear]
+    /// The JSON has no "id" key either; the crash year is unique
+    /// per period, so it doubles as the identity.
+    var id: Int {
+        crashYear
+    }
 
-       /// Backward-compatible alias for older code that used `years`.
-       var years: [HistoricalYear] {
-           priorYears
-       }
+    /// Backward-compatible alias for older code that used `years`.
+    var years: [HistoricalYear] {
+        priorYears
+    }
+
+    // Only keys that actually exist in the JSON are decoded.
+    // (A stored `id` here would make every decode fail with
+    // "keyNotFound: id".)
+    private enum CodingKeys: String, CodingKey {
+        case crashYear
+        case name
+        case priorYears
+    }
+
+    init(
+        crashYear: Int,
+        name: String? = nil,
+        priorYears: [HistoricalYear]
+    ) {
+        self.crashYear = crashYear
+        self.name = name ?? "Crash \(crashYear)"
+        self.priorYears = priorYears
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        let crashYear = try container.decode(Int.self, forKey: .crashYear)
+
+        self.crashYear = crashYear
+        self.name =
+            try container.decodeIfPresent(String.self, forKey: .name)
+            ?? "Crash \(crashYear)"
+        self.priorYears =
+            try container.decodeIfPresent([HistoricalYear].self, forKey: .priorYears)
+            ?? []
+    }
 }
 
 struct MarketParameters: Codable, Equatable {
