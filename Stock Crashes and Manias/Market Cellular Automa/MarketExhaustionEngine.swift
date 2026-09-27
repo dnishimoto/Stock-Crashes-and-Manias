@@ -127,6 +127,9 @@ final class MarketExhaustionEngine: ObservableObject {
             keepingCapacity: true
         )
 
+        // Optional: clear any new dynamics history if you add it
+        // caDynamicsHistory.removeAll(keepingCapacity: true)
+
         let width = max(
             parameters.gridWidth,
             1
@@ -161,15 +164,32 @@ final class MarketExhaustionEngine: ObservableObject {
 
             return MarketCell(
                 id: id,
+
+                // Core resources
                 energy: energy,
                 liquidity: liquidity,
                 capital: capital,
+
+                // Market motion
                 momentum: 0.0,
+                momentumVelocity: 0.0,
+
+                // Potential landscape
                 financialPotential: 0.0,
                 potentialGradient: 0.0,
+                potentialCurvature: 0.0,
+
+                // Accumulated stress
                 exhaustion: 0.0,
                 contagion: 0.0,
                 stress: 0.0,
+
+                // Nonlinear / precursor fields
+                equilibriumDistance: 0.0,
+                equilibriumCompression: 0.0,
+                nonlinearAmplification: 0.0,
+                localInstability: 0.0,
+
                 state: .stable
             )
         }
@@ -437,28 +457,16 @@ final class MarketExhaustionEngine: ObservableObject {
         // ----------------------------------------------------
 
         let positiveMoney =
-            max(
-                normalizedMoneySupply,
-                0.0
-            )
+            max(normalizedMoneySupply, 0.0)
 
         let positiveEconomicGrowth =
-            max(
-                normalizedEconomicGrowth,
-                0.0
-            )
+            max(normalizedEconomicGrowth, 0.0)
 
         let positiveStockGrowth =
-            max(
-                normalizedStockGrowth,
-                0.0
-            )
+            max(normalizedStockGrowth, 0.0)
 
         let positivePolicy =
-            max(
-                normalizedPolicy,
-                0.0
-            )
+            max(normalizedPolicy, 0.0)
 
         let expansionaryEnergy =
             positiveMoney
@@ -478,22 +486,13 @@ final class MarketExhaustionEngine: ObservableObject {
         // ----------------------------------------------------
 
         let negativeMoney =
-            max(
-                -normalizedMoneySupply,
-                0.0
-            )
+            max(-normalizedMoneySupply, 0.0)
 
         let negativeEconomicGrowth =
-            max(
-                -normalizedEconomicGrowth,
-                0.0
-            )
+            max(-normalizedEconomicGrowth, 0.0)
 
         let positiveTaxPressure =
-            max(
-                normalizedTaxGrowth,
-                0.0
-            )
+            max(normalizedTaxGrowth, 0.0)
 
         let contractionaryEnergy =
             negativeMoney
@@ -516,8 +515,7 @@ final class MarketExhaustionEngine: ObservableObject {
 
         let macroEnergyForcing =
             bounded(
-                expansionaryEnergy
-                - contractionaryEnergy,
+                expansionaryEnergy - contractionaryEnergy,
                 minimum: -1.0,
                 maximum: 1.0
             )
@@ -527,44 +525,28 @@ final class MarketExhaustionEngine: ObservableObject {
         // ----------------------------------------------------
 
         let growthMomentum =
-            normalizedEconomicGrowth
-            * 0.40
+            normalizedEconomicGrowth * 0.40
             +
-            normalizedStockGrowth
-            * 0.40
+            normalizedStockGrowth * 0.40
             +
-            normalizedMoneySupply
-            * 0.20
+            normalizedMoneySupply * 0.20
             +
-            normalizedPolicy
-            * 0.20
+            normalizedPolicy * 0.20
 
         let slowdownMomentum =
-            max(
-                -normalizedEconomicGrowth,
-                0.0
-            )
-            * 0.40
+            max(-normalizedEconomicGrowth, 0.0) * 0.40
             +
-            max(
-                -normalizedStockGrowth,
-                0.0
-            )
-            * 0.40
+            max(-normalizedStockGrowth, 0.0) * 0.40
             +
-            normalizedBondYield
-            * 0.20
+            normalizedBondYield * 0.20
             +
-            normalizedBankingStress
-            * 0.20
+            normalizedBankingStress * 0.20
             +
-            normalizedShock
-            * 0.20
+            normalizedShock * 0.20
 
         let macroMomentum =
             bounded(
-                growthMomentum
-                - slowdownMomentum,
+                growthMomentum - slowdownMomentum,
                 minimum: -1.0,
                 maximum: 1.0
             )
@@ -590,23 +572,16 @@ final class MarketExhaustionEngine: ObservableObject {
 
         // ----------------------------------------------------
         // Energy conversion.
-        //
-        // This explicitly connects energyConversion to the
-        // actual cellular energy update.
         // ----------------------------------------------------
 
         let baseInjectedEnergy =
-            externalForcing
-            * parameters.energyInjectionRate
+            externalForcing * parameters.energyInjectionRate
 
         let macroInjectedEnergy =
-            macroEnergyForcing
-            * parameters.macroEnergyInjectionRate
+            macroEnergyForcing * parameters.macroEnergyInjectionRate
 
         let rawInjectedEnergy =
-            baseInjectedEnergy
-            +
-            macroInjectedEnergy
+            baseInjectedEnergy + macroInjectedEnergy
 
         let convertedInjectedEnergy =
             rawInjectedEnergy
@@ -619,18 +594,21 @@ final class MarketExhaustionEngine: ObservableObject {
 
         // ----------------------------------------------------
         // Synchronous CA update.
-        //
         // NEVER read neighbors from nextCells.
         // ----------------------------------------------------
 
         let previousCells = cells
-
         var nextCells = previousCells
+
+        // Optional global targets for equilibrium distance
+        // (can later be made scenario- or lattice-derived)
+        let targetEnergy = parameters.initialEnergy
+        let targetMomentum = 0.0
+        let targetPotential = 0.5
 
         for index in previousCells.indices {
 
-            let cell =
-                previousCells[index]
+            let cell = previousCells[index]
 
             let neighbors =
                 neighboringCells(
@@ -643,208 +621,147 @@ final class MarketExhaustionEngine: ObservableObject {
             // ------------------------------------------------
 
             let neighborEnergy =
-                mean(
-                    neighbors.map(\.energy)
-                )
+                mean(neighbors.map(\.energy))
 
             let neighborMomentum =
-                mean(
-                    neighbors.map(\.momentum)
-                )
+                mean(neighbors.map(\.momentum))
 
             let neighborPotential =
-                mean(
-                    neighbors.map(
-                        \.financialPotential
-                    )
-                )
+                mean(neighbors.map(\.financialPotential))
+
+            let neighborEquilibriumDistance =
+                mean(neighbors.map(\.equilibriumDistance))
 
             // ------------------------------------------------
             // Energy transfer.
             // ------------------------------------------------
 
             let localEnergyTransfer =
-                (
-                    neighborEnergy
-                    - cell.energy
-                )
-                *
-                parameters.energyTransferRate
+                (neighborEnergy - cell.energy)
+                * parameters.energyTransferRate
 
             let preliminaryEnergy =
-                cell.energy
-                *
-                parameters.energyRetention
-                +
-                convertedInjectedEnergy
-                +
-                localEnergyTransfer
+                cell.energy * parameters.energyRetention
+                + convertedInjectedEnergy
+                + localEnergyTransfer
 
             let dissipatedEnergy =
-                max(
-                    preliminaryEnergy,
-                    0.0
-                )
-                *
-                parameters.dissipationRate
+                max(preliminaryEnergy, 0.0)
+                * parameters.dissipationRate
 
             let updatedEnergy =
-                bounded(
-                    preliminaryEnergy
-                    - dissipatedEnergy
-                )
+                bounded(preliminaryEnergy - dissipatedEnergy)
 
             // ------------------------------------------------
-            // Momentum.
+            // Momentum + velocity.
             // ------------------------------------------------
 
             let momentumFromExternalForce =
-                (
-                    externalForcing
-                    - 0.5
-                )
-                *
-                parameters.momentumResponse
+                (externalForcing - 0.5)
+                * parameters.momentumResponse
 
             let momentumFromMacro =
-                macroMomentum
-                *
-                parameters.macroMomentumResponse
+                macroMomentum * parameters.macroMomentumResponse
 
             let momentumFromGradient =
-                (
-                    neighborPotential
-                    - cell.financialPotential
-                )
-                *
-                parameters.potentialGradientResponse
+                (neighborPotential - cell.financialPotential)
+                * parameters.potentialGradientResponse
 
             let momentumTransfer =
-                (
-                    neighborMomentum
-                    - cell.momentum
-                )
-                *
-                parameters.momentumTransferRate
+                (neighborMomentum - cell.momentum)
+                * parameters.momentumTransferRate
 
             let updatedMomentum =
                 bounded(
-                    cell.momentum
-                    *
-                    parameters.momentumRetention
-                    +
-                    momentumFromExternalForce
-                    +
-                    momentumFromMacro
-                    +
-                    momentumFromGradient
-                    +
-                    momentumTransfer,
+                    cell.momentum * parameters.momentumRetention
+                    + momentumFromExternalForce
+                    + momentumFromMacro
+                    + momentumFromGradient
+                    + momentumTransfer,
+                    minimum: -1.0,
+                    maximum: 1.0
+                )
+
+            let updatedMomentumVelocity =
+                bounded(
+                    updatedMomentum - cell.momentum,
                     minimum: -1.0,
                     maximum: 1.0
                 )
 
             // ------------------------------------------------
             // Financial potential.
-            //
-            // This is a model-defined financial potential,
-            // not physical gravitational potential.
             // ------------------------------------------------
 
             let potentialInput =
-                updatedEnergy
-                *
-                parameters.potentialEnergyWeight
-                +
-                abs(updatedMomentum)
-                *
-                parameters.potentialMomentumWeight
+                updatedEnergy * parameters.potentialEnergyWeight
+                + abs(updatedMomentum) * parameters.potentialMomentumWeight
 
             let updatedPotential =
                 bounded(
                     cell.financialPotential
-                    +
-                    (
-                        potentialInput
-                        -
-                        cell.financialPotential
-                    )
-                    *
-                    parameters.potentialGain
+                    + (potentialInput - cell.financialPotential)
+                    * parameters.potentialGain
                 )
 
             let potentialGradient =
                 bounded(
-                    updatedPotential
-                    - neighborPotential,
+                    updatedPotential - neighborPotential,
                     minimum: -1.0,
                     maximum: 1.0
                 )
+
+            // ------------------------------------------------
+            // Potential curvature (local sharpness).
+            // ------------------------------------------------
+
+            let potentialCurvature =
+                neighbors.isEmpty
+                ? 0.0
+                : bounded(
+                    abs(updatedPotential - neighborPotential)
+                  )
 
             // ------------------------------------------------
             // Liquidity depletion.
             // ------------------------------------------------
 
             let baseLiquidityDepletion =
-                max(
-                    externalForcing,
-                    0.0
-                )
-                *
-                parameters.liquidityDepletionRate
+                max(externalForcing, 0.0)
+                * parameters.liquidityDepletionRate
 
             let inflationLiquidity =
-                normalizedInflation
-                *
-                parameters.inflationLiquidityRate
+                normalizedInflation * parameters.inflationLiquidityRate
 
             let bondLiquidity =
-                normalizedBondYield
-                *
-                parameters.bondYieldLiquidityRate
+                normalizedBondYield * parameters.bondYieldLiquidityRate
 
             let bankingLiquidity =
-                normalizedBankingStress
-                *
-                parameters.bankingLiquidityRate
+                normalizedBankingStress * parameters.bankingLiquidityRate
 
             let taxLiquidity =
-                positiveTaxPressure
-                *
-                parameters.taxLiquidityRate
+                positiveTaxPressure * parameters.taxLiquidityRate
 
             let shockLiquidity =
-                normalizedShock
-                *
-                parameters.externalShockCapitalRate
+                normalizedShock * parameters.externalShockCapitalRate
 
             let financialPotentialLiquidity =
-                updatedPotential
-                *
-                parameters.liquidityDepletionRate
+                updatedPotential * parameters.liquidityDepletionRate
 
             let liquidityDepletion =
                 baseLiquidityDepletion
-                +
-                inflationLiquidity
-                +
-                bondLiquidity
-                +
-                bankingLiquidity
-                +
-                taxLiquidity
-                +
-                shockLiquidity
-                +
-                financialPotentialLiquidity
+                + inflationLiquidity
+                + bondLiquidity
+                + bankingLiquidity
+                + taxLiquidity
+                + shockLiquidity
+                + financialPotentialLiquidity
 
             let updatedLiquidity =
                 bounded(
                     cell.liquidity
                     - liquidityDepletion
-                    +
-                    parameters.exhaustionRecoveryRate
-                    * 0.25
+                    + parameters.exhaustionRecoveryRate * 0.25
                 )
 
             // ------------------------------------------------
@@ -852,46 +769,22 @@ final class MarketExhaustionEngine: ObservableObject {
             // ------------------------------------------------
 
             let capitalDepletion =
-                updatedPotential
-                *
-                parameters.capitalDepletionRate
-                +
-                normalizedTaxGrowth
-                *
-                parameters.taxCapitalRate
-                +
-                normalizedBankingStress
-                *
-                parameters.bankingCapitalRate
-                +
-                normalizedShock
-                *
-                parameters.externalShockCapitalRate
-                +
-                max(
-                    -normalizedEconomicGrowth,
-                    0.0
-                )
-                *
-                parameters.capitalDepletionRate
+                updatedPotential * parameters.capitalDepletionRate
+                + normalizedTaxGrowth * parameters.taxCapitalRate
+                + normalizedBankingStress * parameters.bankingCapitalRate
+                + normalizedShock * parameters.externalShockCapitalRate
+                + max(-normalizedEconomicGrowth, 0.0)
+                * parameters.capitalDepletionRate
 
             let updatedCapital =
-                bounded(
-                    cell.capital
-                    - capitalDepletion
-                )
+                bounded(cell.capital - capitalDepletion)
 
             // ------------------------------------------------
             // Neighbor contagion.
-            //
-            // Only critical/crashed neighbors contribute.
             // ------------------------------------------------
 
             let criticalNeighborCount =
-                neighbors.reduce(
-                    into: 0
-                ) { count, neighbor in
-
+                neighbors.reduce(into: 0) { count, neighbor in
                     if neighbor.state == .critical
                         || neighbor.state == .crashed
                     {
@@ -902,44 +795,23 @@ final class MarketExhaustionEngine: ObservableObject {
             let contagionFraction =
                 neighbors.isEmpty
                 ? 0.0
-                : Double(
-                    criticalNeighborCount
-                )
-                /
-                Double(
-                    neighbors.count
-                )
+                : Double(criticalNeighborCount)
+                  / Double(neighbors.count)
 
             let updatedContagion =
-                bounded(
-                    contagionFraction
-                    *
-                    parameters.contagionRate
-                )
+                bounded(contagionFraction * parameters.contagionRate)
 
             // ------------------------------------------------
             // Resource depletion.
             // ------------------------------------------------
 
             let energyDepletion =
-                bounded(
-                    1.0
-                    - updatedEnergy
-                )
+                bounded(1.0 - updatedEnergy)
 
             let resourceDepletion =
                 bounded(
-                    (
-                        1.0
-                        - updatedLiquidity
-                    )
-                    * 0.50
-                    +
-                    (
-                        1.0
-                        - updatedCapital
-                    )
-                    * 0.50
+                    (1.0 - updatedLiquidity) * 0.50
+                    + (1.0 - updatedCapital) * 0.50
                 )
 
             // ------------------------------------------------
@@ -947,38 +819,26 @@ final class MarketExhaustionEngine: ObservableObject {
             // ------------------------------------------------
 
             let directExhaustion =
-                energyDepletion
-                *
-                parameters.energyDepletionStressWeight
+                energyDepletion * parameters.energyDepletionStressWeight
 
             let resourceExhaustion =
-                resourceDepletion
-                *
-                parameters.exhaustionAccumulationRate
+                resourceDepletion * parameters.exhaustionAccumulationRate
 
             let macroExhaustion =
-                macroStress
-                *
-                parameters.macroExhaustionRate
+                macroStress * parameters.macroExhaustionRate
 
             let recovery =
                 updatedLiquidity
-                *
-                updatedCapital
-                *
-                parameters.exhaustionRecoveryRate
+                * updatedCapital
+                * parameters.exhaustionRecoveryRate
 
             let updatedExhaustion =
                 bounded(
                     cell.exhaustion
-                    +
-                    directExhaustion
-                    +
-                    resourceExhaustion
-                    +
-                    macroExhaustion
-                    -
-                    recovery
+                    + directExhaustion
+                    + resourceExhaustion
+                    + macroExhaustion
+                    - recovery
                 )
 
             // ------------------------------------------------
@@ -986,110 +846,177 @@ final class MarketExhaustionEngine: ObservableObject {
             // ------------------------------------------------
 
             let energyStress =
-                energyDepletion
-                *
-                parameters.energyWeight
+                energyDepletion * parameters.energyWeight
 
             let momentumStress =
-                max(
-                    -updatedMomentum,
-                    0.0
-                )
-                *
-                parameters.momentumWeight
+                max(-updatedMomentum, 0.0) * parameters.momentumWeight
 
             let potentialStress =
-                updatedPotential
-                *
-                parameters.potentialWeight
+                updatedPotential * parameters.potentialWeight
 
             let exhaustionStress =
-                updatedExhaustion
-                *
-                parameters.exhaustionWeight
+                updatedExhaustion * parameters.exhaustionWeight
 
             let contagionStress =
-                updatedContagion
-                *
-                parameters.contagionWeight
+                updatedContagion * parameters.contagionWeight
 
             let macroStressComponent =
-                macroStress
-                *
-                parameters.macroStressWeight
+                macroStress * parameters.macroStressWeight
 
             let dissipationStress =
-                dissipatedEnergy
-                *
-                parameters.energyDissipationWeight
+                dissipatedEnergy * parameters.energyDissipationWeight
 
             let potentialGradientStress =
-                abs(
-                    potentialGradient
-                )
-                *
-                parameters.potentialWeight
-                *
-                0.50
-
-            // ------------------------------------------------
-            // Stochastic perturbation.
-            //
-            // Deterministic because SplitMix64 is reset from
-            // MarketParameters.randomSeed.
-            // ------------------------------------------------
+                abs(potentialGradient)
+                * parameters.potentialWeight
+                * 0.50
 
             let noise =
-                random.centeredUnit()
-                *
-                0.02
+                random.centeredUnit() * 0.02
 
             let rawStress =
                 energyStress
-                +
-                momentumStress
-                +
-                potentialStress
-                +
-                exhaustionStress
-                +
-                contagionStress
-                +
-                macroStressComponent
-                +
-                dissipationStress
-                +
-                potentialGradientStress
-                +
-                noise
+                + momentumStress
+                + potentialStress
+                + exhaustionStress
+                + contagionStress
+                + macroStressComponent
+                + dissipationStress
+                + potentialGradientStress
+                + noise
 
             let updatedStress =
+                bounded(rawStress)
+
+            // ------------------------------------------------
+            // Equilibrium distance.
+            // ------------------------------------------------
+
+            let energyDistance =
+                abs(updatedEnergy - targetEnergy)
+
+            let momentumDistance =
+                abs(updatedMomentum - targetMomentum)
+
+            let potentialDistance =
+                abs(updatedPotential - targetPotential)
+
+            let updatedEquilibriumDistance =
                 bounded(
-                    rawStress
+                    (energyDistance + momentumDistance + potentialDistance) / 3.0
                 )
 
             // ------------------------------------------------
-            // State classification.
+            // Equilibrium compression (neighbor coupling).
             // ------------------------------------------------
+
+            let updatedEquilibriumCompression: Double
+            if neighbors.isEmpty {
+                updatedEquilibriumCompression = 0.0
+            } else {
+                let convergence =
+                    1.0 - abs(
+                        updatedEquilibriumDistance
+                        - neighborEquilibriumDistance
+                    )
+                updatedEquilibriumCompression =
+                    bounded(convergence)
+            }
+
+            // Optional mild attraction toward equilibrium
+            // (can be strengthened later via parameters)
+            _ = parameters.equilibriumAttractionRate
+            _ = parameters.equilibriumCouplingRate
+
+            // ------------------------------------------------
+            // Nonlinear amplification.
+            // ------------------------------------------------
+
+            let updatedNonlinearAmplification =
+                bounded(
+                    updatedEquilibriumCompression
+                    * (
+                        potentialCurvature
+                        * parameters.curvatureInstabilityRate
+                        +
+                        updatedStress
+                        * parameters.nonlinearAmplificationRate
+                    )
+                )
+
+            // ------------------------------------------------
+            // Local instability.
+            // ------------------------------------------------
+
+            let accumulation =
+                (
+                    updatedNonlinearAmplification
+                    + updatedExhaustion
+                    + updatedContagion
+                ) / 3.0
+
+            var updatedLocalInstability = cell.localInstability
+
+            if accumulation > parameters.localInstabilityThreshold {
+                updatedLocalInstability +=
+                    accumulation * parameters.instabilityAccumulationRate
+            } else {
+                updatedLocalInstability -=
+                    parameters.instabilityRecoveryRate
+            }
+
+            updatedLocalInstability =
+                bounded(updatedLocalInstability)
+
+            // ------------------------------------------------
+            // State classification (multi-signal).
+            // ------------------------------------------------
+
+            let stateSignal =
+                bounded(
+                    (
+                        updatedStress
+                        + updatedExhaustion
+                        + updatedNonlinearAmplification
+                        + updatedLocalInstability
+                        + updatedContagion
+                    ) / 5.0
+                )
 
             let updatedState =
                 classifyState(
-                    stress: updatedStress,
+                    stress: stateSignal,
                     energy: updatedEnergy
                 )
+
+            // ------------------------------------------------
+            // Write next cell.
+            // ------------------------------------------------
 
             nextCells[index] =
                 MarketCell(
                     id: cell.id,
+
                     energy: updatedEnergy,
                     liquidity: updatedLiquidity,
                     capital: updatedCapital,
+
                     momentum: updatedMomentum,
+                    momentumVelocity: updatedMomentumVelocity,
+
                     financialPotential: updatedPotential,
                     potentialGradient: potentialGradient,
+                    potentialCurvature: potentialCurvature,
+
                     exhaustion: updatedExhaustion,
                     contagion: updatedContagion,
                     stress: updatedStress,
+
+                    equilibriumDistance: updatedEquilibriumDistance,
+                    equilibriumCompression: updatedEquilibriumCompression,
+                    nonlinearAmplification: updatedNonlinearAmplification,
+                    localInstability: updatedLocalInstability,
+
                     state: updatedState
                 )
         }

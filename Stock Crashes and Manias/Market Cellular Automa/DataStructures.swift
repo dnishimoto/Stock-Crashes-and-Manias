@@ -1,10 +1,3 @@
-//
-//  File2.swift
-//  Stock Crashes and Manias
-//
-//  Created by David Nishimoto on 9/10/26.
-//
-
 import Foundation
 import SwiftUI
 import Combine
@@ -296,23 +289,32 @@ struct MarketVolumePoint:
 // MARK: - Market Cell
 // ============================================================
 
-struct MarketCell:
-    Identifiable
-{
-
+struct MarketCell: Identifiable {
     let id: Int
 
     var energy: Double
     var liquidity: Double
     var capital: Double
 
+    // Market motion
     var momentum: Double
+    var momentumVelocity: Double
+
+    // Potential landscape
     var financialPotential: Double
     var potentialGradient: Double
+    var potentialCurvature: Double
 
+    // Accumulated stress
     var exhaustion: Double
     var contagion: Double
     var stress: Double
+
+    // New nonlinear / precursor fields
+    var equilibriumDistance: Double
+    var equilibriumCompression: Double
+    var nonlinearAmplification: Double
+    var localInstability: Double
 
     var state: MarketState
 }
@@ -405,6 +407,45 @@ struct MarketParameters:
 
     var potentialEnergyWeight: Double = 0.60
     var potentialMomentumWeight: Double = 0.40
+
+    // --------------------------------------------------------
+    // Equilibrium / nonlinear transition
+    // --------------------------------------------------------
+    /// Strength of attraction toward the local market equilibrium.
+    var equilibriumAttractionRate: Double = 0.18
+
+    /// Measures how strongly neighboring cells converge toward
+    /// a common financial state.
+    var equilibriumCouplingRate: Double = 0.20
+
+    /// Controls nonlinear amplification when the system is
+    /// compressed near equilibrium.
+    var nonlinearAmplificationRate: Double = 0.12
+
+    /// Controls how strongly potential curvature contributes
+    /// to instability.
+    var curvatureInstabilityRate: Double = 0.20
+
+    /// Controls accumulation of local instability.
+    var instabilityAccumulationRate: Double = 0.15
+
+    /// Recovery of local instability when the system moves
+    /// away from the critical region.
+    var instabilityRecoveryRate: Double = 0.04
+
+    /// Threshold at which equilibrium compression becomes
+    /// a nonlinear precursor.
+    var equilibriumCompressionThreshold: Double = 0.60
+
+    /// Threshold for power-law acceleration.
+    var powerLawThreshold: Double = 0.70
+
+    /// Threshold for local instability.
+    var localInstabilityThreshold: Double = 0.75
+
+    /// Fraction of critical cells required before systemic
+    /// nonlinear behavior is recognized.
+    var systemicNonlinearFraction: Double = 0.20
 
 
     // --------------------------------------------------------
@@ -519,6 +560,69 @@ struct YearlyRiskSnapshot:
 
     let criticalFraction: Double
     let crashFraction: Double
+}
+
+
+// ============================================================
+// MARK: - CADynamicsSnapshot
+// ============================================================
+
+struct CADynamicsSnapshot:
+    Identifiable,
+    Codable,
+    Equatable
+{
+    var id: Int {
+        year
+    }
+
+    let year: Int
+
+    let meanEquilibriumDistance: Double
+    let equilibriumCompression: Double
+
+    let meanPotentialGradient: Double
+    let potentialCurvature: Double
+
+    let meanNonlinearAmplification: Double
+    let nonlinearFraction: Double
+
+    let meanLocalInstability: Double
+    let instabilityFraction: Double
+
+    let momentumAcceleration: Double
+
+    let systemicRisk: Double
+    let state: MarketState
+}
+
+
+// ============================================================
+// MARK: - CAPrecursorSignal
+// ============================================================
+
+struct CAPrecursorSignal {
+    let equilibriumCompression: Double
+    let nonlinearAmplification: Double
+    let instability: Double
+    let contagion: Double
+    let momentumAcceleration: Double
+
+    var strength: Double {
+        min(
+            max(
+                (
+                    equilibriumCompression
+                    + nonlinearAmplification
+                    + instability
+                    + contagion
+                    + momentumAcceleration
+                ) / 5.0,
+                0.0
+            ),
+            1.0
+        )
+    }
 }
 
 
@@ -1402,5 +1506,4 @@ let historicalMarketJSON = """
   ]
 }
 """
-
 

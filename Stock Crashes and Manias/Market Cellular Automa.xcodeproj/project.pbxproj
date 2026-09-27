@@ -24,15 +24,15 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		F7C5404D3051F47B003DF0A3 /* Stock Crashes and Manias.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Stock Crashes and Manias.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		F7C5405F3051F47C003DF0A3 /* Stock Crashes and ManiasTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Stock Crashes and ManiasTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		F7C540693051F47C003DF0A3 /* Stock Crashes and ManiasUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Stock Crashes and ManiasUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F7C5404D3051F47B003DF0A3 /* Market Cellular Automa.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Market Cellular Automa.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F7C5405F3051F47C003DF0A3 /* Market Cellular AutomaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Market Cellular AutomaTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F7C540693051F47C003DF0A3 /* Market Cellular AutomaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Market Cellular AutomaUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		F7C5404F3051F47B003DF0A3 /* Stock Crashes and Manias */ = {
+		F7C5404F3051F47B003DF0A3 /* Market Cellular Automa */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Stock Crashes and Manias";
+			path = "Market Cellular Automa";
 			sourceTree = "<group>";
 		};
 		F7C540623051F47C003DF0A3 /* Stock Crashes and ManiasTests */ = {
@@ -75,7 +75,7 @@
 		F7C540443051F47B003DF0A3 = {
 			isa = PBXGroup;
 			children = (
-				F7C5404F3051F47B003DF0A3 /* Stock Crashes and Manias */,
+				F7C5404F3051F47B003DF0A3 /* Market Cellular Automa */,
 				F7C540623051F47C003DF0A3 /* Stock Crashes and ManiasTests */,
 				F7C5406C3051F47C003DF0A3 /* Stock Crashes and ManiasUITests */,
 				F7C5404E3051F47B003DF0A3 /* Products */,
@@ -85,9 +85,9 @@
 		F7C5404E3051F47B003DF0A3 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				F7C5404D3051F47B003DF0A3 /* Stock Crashes and Manias.app */,
-				F7C5405F3051F47C003DF0A3 /* Stock Crashes and ManiasTests.xctest */,
-				F7C540693051F47C003DF0A3 /* Stock Crashes and ManiasUITests.xctest */,
+				F7C5404D3051F47B003DF0A3 /* Market Cellular Automa.app */,
+				F7C5405F3051F47C003DF0A3 /* Market Cellular AutomaTests.xctest */,
+				F7C540693051F47C003DF0A3 /* Market Cellular AutomaUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,9 +95,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		F7C5404C3051F47B003DF0A3 /* Stock Crashes and Manias */ = {
+		F7C5404C3051F47B003DF0A3 /* Market Cellular Automa */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F7C540733051F47C003DF0A3 /* Build configuration list for PBXNativeTarget "Stock Crashes and Manias" */;
+			buildConfigurationList = F7C540733051F47C003DF0A3 /* Build configuration list for PBXNativeTarget "Market Cellular Automa" */;
 			buildPhases = (
 				F7C540493051F47B003DF0A3 /* Sources */,
 				F7C5404A3051F47B003DF0A3 /* Frameworks */,
@@ -108,18 +108,18 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				F7C5404F3051F47B003DF0A3 /* Stock Crashes and Manias */,
+				F7C5404F3051F47B003DF0A3 /* Market Cellular Automa */,
 			);
-			name = "Stock Crashes and Manias";
+			name = "Market Cellular Automa";
 			packageProductDependencies = (
 			);
 			productName = "Stock Crashes and Manias";
-			productReference = F7C5404D3051F47B003DF0A3 /* Stock Crashes and Manias.app */;
+			productReference = F7C5404D3051F47B003DF0A3 /* Market Cellular Automa.app */;
 			productType = "com.apple.product-type.application";
 		};
-		F7C5405E3051F47C003DF0A3 /* Stock Crashes and ManiasTests */ = {
+		F7C5405E3051F47C003DF0A3 /* Market Cellular AutomaTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F7C540763051F47C003DF0A3 /* Build configuration list for PBXNativeTarget "Stock Crashes and ManiasTests" */;
+			buildConfigurationList = F7C540763051F47C003DF0A3 /* Build configuration list for PBXNativeTarget "Market Cellular AutomaTests" */;
 			buildPhases = (
 				F7C5405B3051F47C003DF0A3 /* Sources */,
 				F7C5405C3051F47C003DF0A3 /* Frameworks */,
@@ -133,16 +133,16 @@
 			fileSystemSynchronizedGroups = (
 				F7C540623051F47C003DF0A3 /* Stock Crashes and ManiasTests */,
 			);
-			name = "Stock Crashes and ManiasTests";
+			name = "Market Cellular AutomaTests";
 			packageProductDependencies = (
 			);
 			productName = "Stock Crashes and ManiasTests";
-			productReference = F7C5405F3051F47C003DF0A3 /* Stock Crashes and ManiasTests.xctest */;
+			productReference = F7C5405F3051F47C003DF0A3 /* Market Cellular AutomaTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		F7C540683051F47C003DF0A3 /* Stock Crashes and ManiasUITests */ = {
+		F7C540683051F47C003DF0A3 /* Market Cellular AutomaUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F7C540793051F47C003DF0A3 /* Build configuration list for PBXNativeTarget "Stock Crashes and ManiasUITests" */;
+			buildConfigurationList = F7C540793051F47C003DF0A3 /* Build configuration list for PBXNativeTarget "Market Cellular AutomaUITests" */;
 			buildPhases = (
 				F7C540653051F47C003DF0A3 /* Sources */,
 				F7C540663051F47C003DF0A3 /* Frameworks */,
@@ -156,11 +156,11 @@
 			fileSystemSynchronizedGroups = (
 				F7C5406C3051F47C003DF0A3 /* Stock Crashes and ManiasUITests */,
 			);
-			name = "Stock Crashes and ManiasUITests";
+			name = "Market Cellular AutomaUITests";
 			packageProductDependencies = (
 			);
 			productName = "Stock Crashes and ManiasUITests";
-			productReference = F7C540693051F47C003DF0A3 /* Stock Crashes and ManiasUITests.xctest */;
+			productReference = F7C540693051F47C003DF0A3 /* Market Cellular AutomaUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -186,7 +186,7 @@
 					};
 				};
 			};
-			buildConfigurationList = F7C540483051F47B003DF0A3 /* Build configuration list for PBXProject "Stock Crashes and Manias" */;
+			buildConfigurationList = F7C540483051F47B003DF0A3 /* Build configuration list for PBXProject "Market Cellular Automa" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -200,9 +200,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				F7C5404C3051F47B003DF0A3 /* Stock Crashes and Manias */,
-				F7C5405E3051F47C003DF0A3 /* Stock Crashes and ManiasTests */,
-				F7C540683051F47C003DF0A3 /* Stock Crashes and ManiasUITests */,
+				F7C5404C3051F47B003DF0A3 /* Market Cellular Automa */,
+				F7C5405E3051F47C003DF0A3 /* Market Cellular AutomaTests */,
+				F7C540683051F47C003DF0A3 /* Market Cellular AutomaUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -258,12 +258,12 @@
 /* Begin PBXTargetDependency section */
 		F7C540613051F47C003DF0A3 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = F7C5404C3051F47B003DF0A3 /* Stock Crashes and Manias */;
+			target = F7C5404C3051F47B003DF0A3 /* Market Cellular Automa */;
 			targetProxy = F7C540603051F47C003DF0A3 /* PBXContainerItemProxy */;
 		};
 		F7C5406B3051F47C003DF0A3 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = F7C5404C3051F47B003DF0A3 /* Stock Crashes and Manias */;
+			target = F7C5404C3051F47B003DF0A3 /* Market Cellular Automa */;
 			targetProxy = F7C5406A3051F47C003DF0A3 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -400,6 +400,8 @@
 				DEVELOPMENT_TEAM = D79GCWU2TB;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Market Cellular Automa";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -432,6 +434,8 @@
 				DEVELOPMENT_TEAM = D79GCWU2TB;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Market Cellular Automa";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -472,7 +476,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Stock Crashes and Manias.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Stock Crashes and Manias";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Market Cellular Automa.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Market Cellular Automa";
 			};
 			name = Debug;
 		};
@@ -494,7 +498,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Stock Crashes and Manias.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Stock Crashes and Manias";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Market Cellular Automa.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Market Cellular Automa";
 			};
 			name = Release;
 		};
@@ -541,7 +545,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		F7C540483051F47B003DF0A3 /* Build configuration list for PBXProject "Stock Crashes and Manias" */ = {
+		F7C540483051F47B003DF0A3 /* Build configuration list for PBXProject "Market Cellular Automa" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F7C540713051F47C003DF0A3 /* Debug */,
@@ -550,7 +554,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		F7C540733051F47C003DF0A3 /* Build configuration list for PBXNativeTarget "Stock Crashes and Manias" */ = {
+		F7C540733051F47C003DF0A3 /* Build configuration list for PBXNativeTarget "Market Cellular Automa" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F7C540743051F47C003DF0A3 /* Debug */,
@@ -559,7 +563,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		F7C540763051F47C003DF0A3 /* Build configuration list for PBXNativeTarget "Stock Crashes and ManiasTests" */ = {
+		F7C540763051F47C003DF0A3 /* Build configuration list for PBXNativeTarget "Market Cellular AutomaTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F7C540773051F47C003DF0A3 /* Debug */,
@@ -568,7 +572,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		F7C540793051F47C003DF0A3 /* Build configuration list for PBXNativeTarget "Stock Crashes and ManiasUITests" */ = {
+		F7C540793051F47C003DF0A3 /* Build configuration list for PBXNativeTarget "Market Cellular AutomaUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F7C5407A3051F47C003DF0A3 /* Debug */,

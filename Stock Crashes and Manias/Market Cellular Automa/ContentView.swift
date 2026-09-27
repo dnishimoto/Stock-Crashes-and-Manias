@@ -93,7 +93,39 @@ struct ContentView: View {
         }
     }
 
-   
+    // ========================================================
+    // MARK: Clamp Helper
+    // ========================================================
+
+    private func clamp(_ value: Double) -> Double {
+        min(1, max(0, value.isFinite ? value : 0))
+    }
+
+    // ========================================================
+    // MARK: Current Equilibrium Computation
+    // ========================================================
+
+    private var currentEquilibrium: Double {
+        let moneySignal = clamp((growthM2 - (-5)) / (20 - (-5)))
+        let stockSignal = clamp((stockGrowthPercent - (-50)) / (100 - (-50)))
+        let volumeSignal = clamp((growthVolumePercent - (-50)) / (300 - (-50)))
+        let inflationSignal = clamp((inflationPercent - 0) / (15 - 0))
+        let bondSignal = clamp((bondYieldAvgPercent - 0) / (15 - 0))
+        let bankingSignal = clamp((bankingCreditStressRating - 0) / (10 - 0))
+        let cycleIntervalSignal = clamp((crashInterval - 0) / (25 - 0))
+        let momentum = clamp(0.45 * moneySignal + 0.35 * stockSignal + 0.20 * volumeSignal)
+        let momentumTurn = clamp(1.0 - momentum + 0.50 * inflationSignal + 0.25 * bondSignal)
+        let equilibrium = clamp(0.45 * momentumTurn + 0.25 * inflationSignal + 0.15 * bondSignal + 0.10 * volumeSignal + 0.05 * cycleIntervalSignal + 0.10 * bankingSignal)
+        return equilibrium
+    }
+
+   // ========================================================
+   // MARK: Equilibrium Color
+   // ========================================================
+
+    private var equilibriumColor: Color {
+        currentEquilibrium >= 0.65 ? .red : .green
+    }
 
     // ========================================================
     // MARK: Historical Crash Panel
@@ -452,10 +484,19 @@ struct ContentView: View {
             spacing: 12
         ) {
 
-            Text(
-                "Current Scenario"
-            )
-            .font(.headline)
+            HStack {
+                Text(
+                    "Current Scenario"
+                )
+                .font(.headline)
+
+                Spacer()
+
+                Text(percent(currentEquilibrium))
+                    .font(.headline.monospacedDigit())
+                    .foregroundStyle(equilibriumColor)
+                    .accessibilityLabel("Equilibrium for 2026")
+            }
 
             Text(
                 "Simulation Year: \(selectedYear)"
@@ -592,6 +633,15 @@ struct ContentView: View {
                 "Current Scenario Result"
             )
             .font(.title3.bold())
+
+            // Show the calculated current equilibrium metric for 2026
+            HStack {
+                Text("Equilibrium (2026)")
+                Spacer()
+                Text(percent(currentEquilibrium))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
 
             cellularAutomatonCard
 
