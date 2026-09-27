@@ -1,4 +1,4 @@
-//
+
 //  MarketExhaustionEngine.swift
 //  Stock Crashes and Manias
 //
@@ -235,6 +235,13 @@ final class MarketExhaustionEngine: ObservableObject {
 
         var previousYear: HistoricalYear?
         var finalResult: MarketRiskResult?
+        var frames: [HistoricalCAFrame] = []
+
+        // Carried forward so the crash year itself can be run as
+        // one more CA generation at the terminal pressure level.
+        var lastEquilibrium = 0.0
+        var lastVolume = 0.0
+        var lastScenario: MarketScenario = .neutral
 
         // Advance the CA year-by-year using THIS period's data
         for historicalYear in sortedYears {
@@ -257,20 +264,45 @@ final class MarketExhaustionEngine: ObservableObject {
                 scenario: scenarioValue
             )
 
-            historicalFrames.append(
-                HistoricalCAFrame(
-                    year: historicalYear.year,
-                    isCrashYear: false,
-                    moneyEnergyChange: scenarioValue.moneySupplyChangePercent,
-                    volumePressure: volume,
-                    cells: cells
-                )
+            let frame = HistoricalCAFrame(
+                year: historicalYear.year,
+                isCrashYear: false,
+                moneyEnergyChange: scenarioValue.moneySupplyChangePercent,
+                volumePressure: volume,
+                cells: cells
             )
+            frames.append(frame)
+            historicalFrames.append(frame)
+
+            lastEquilibrium = equilibrium
+            lastVolume = volume
+            lastScenario = scenarioValue
 
             previousYear = historicalYear
         }
 
-        guard let result = finalResult else { return nil }
+        guard finalResult != nil else { return nil }
+
+        // Crash-year frame: one more generation at the terminal
+        // pressure, so accumulated exhaustion / contagion can
+        // actually propagate. The model decides whether cells tip
+        // into Crashed; nothing is scripted.
+        let result = runYear(
+            year: period.crashYear,
+            equilibriumPressure: lastEquilibrium,
+            volumePressure: lastVolume,
+            scenario: lastScenario
+        )
+
+        let crashFrame = HistoricalCAFrame(
+            year: period.crashYear,
+            isCrashYear: true,
+            moneyEnergyChange: lastScenario.moneySupplyChangePercent,
+            volumePressure: lastVolume,
+            cells: cells
+        )
+        frames.append(crashFrame)
+        historicalFrames.append(crashFrame)
 
         let interval = period.crashYear - sortedYears.last!.year
 
@@ -279,7 +311,8 @@ final class MarketExhaustionEngine: ObservableObject {
             year: period.crashYear,
             intervalYears: interval,
             result: result,
-            cells: cells
+            cells: cells,
+            frames: frames
         )
 
         historicalAnalyses.append(crashAnalysis)
@@ -1168,7 +1201,8 @@ final class MarketExhaustionEngine: ObservableObject {
             criticalFraction: critical,
             crashFraction: crashed,
             systemicRisk: systemic,
-            riskLevel: classifyState(stress: systemic, energy: 1.0)
+            riskLevel: classifyState(stress: systemic, energy: 1.0),
+            cellularStress: bounded(meanStress)
         )
     }
 

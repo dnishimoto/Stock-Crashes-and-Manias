@@ -162,9 +162,7 @@ struct MarketScenario:
 // HistoricalCARow
 // ============================================================
 
-struct HistoricalCARow: Identifiable {
-
-    let id: Int
+struct HistoricalCARow {
 
     let period: HistoricalCrashPeriod
 
@@ -180,7 +178,6 @@ struct HistoricalCARow: Identifiable {
         result: MarketRiskResult,
         cells: [MarketCell]
     ) {
-        self.id = period.id
         self.period = period
         self.analysis = analysis
         self.result = result
@@ -316,18 +313,6 @@ struct MarketCell: Identifiable {
     // Persistent heterogeneous characteristics
     // --------------------------------------------------------
 
-    /// Local liquidity reserve.
-    ///
-    /// Higher values allow the cell to absorb temporary
-    /// liquidity pressure before entering a severe state.
-    var liquidityBuffer: Double
-
-    /// Local capital reserve.
-    ///
-    /// Higher values allow the cell to absorb losses before
-    /// becoming unstable.
-    var capitalBuffer: Double
-
     /// Structural fragility / leverage.
     ///
     /// Higher values make the cell more sensitive to stress,
@@ -366,6 +351,66 @@ struct MarketCell: Identifiable {
     // --------------------------------------------------------
 
     var state: MarketState
+
+    // --------------------------------------------------------
+    // Explicit initializer
+    //
+    // Argument order matches how MarketExhaustionEngine builds
+    // cells (heterogeneity traits directly after capital).
+    // --------------------------------------------------------
+
+    init(
+        id: Int,
+
+        energy: Double,
+        liquidity: Double,
+        capital: Double,
+
+        fragility: Double,
+        macroExposure: Double,
+        recoveryCapacity: Double,
+        localShockSusceptibility: Double,
+
+        momentum: Double,
+        momentumVelocity: Double,
+
+        financialPotential: Double,
+        potentialGradient: Double,
+        potentialCurvature: Double,
+
+        exhaustion: Double,
+        contagion: Double,
+        stress: Double,
+
+        equilibriumDistance: Double,
+        equilibriumCompression: Double,
+        nonlinearAmplification: Double,
+        localInstability: Double,
+
+        state: MarketState
+    ) {
+        self.id = id
+        self.energy = energy
+        self.liquidity = liquidity
+        self.capital = capital
+        self.fragility = fragility
+        self.macroExposure = macroExposure
+        self.recoveryCapacity = recoveryCapacity
+        self.localShockSusceptibility = localShockSusceptibility
+        self.momentum = momentum
+        self.momentumVelocity = momentumVelocity
+        self.financialPotential = financialPotential
+        self.potentialGradient = potentialGradient
+        self.potentialCurvature = potentialCurvature
+        self.exhaustion = exhaustion
+        self.contagion = contagion
+        self.stress = stress
+        self.equilibriumDistance = equilibriumDistance
+        self.equilibriumCompression = equilibriumCompression
+        self.nonlinearAmplification = nonlinearAmplification
+        self.localInstability = localInstability
+        self.state = state
+    }
 }
 
 
@@ -378,8 +423,7 @@ struct MarketCell: Identifiable {
 // CAParameters has been removed.
 // All cellular and macroeconomic coefficients live here.
 //
-struct HistoricalCrashPeriod: Codable, Identifiable {
-    let id: Int
+struct HistoricalCrashPeriod: Codable {
 
     /// Year in which the major crash occurred.
     let crashYear: Int
@@ -387,8 +431,15 @@ struct HistoricalCrashPeriod: Codable, Identifiable {
     /// Human-readable name for the historical event.
     let name: String
 
-    /// Years of historical data used to build the pre-crash stress trajectory.
-    let years: [HistoricalYear]
+
+       /// Years of historical data used to build the pre-crash stress trajectory.
+       /// (Matches the "priorYears" key in the historical JSON.)
+       let priorYears: [HistoricalYear]
+
+       /// Backward-compatible alias for older code that used `years`.
+       var years: [HistoricalYear] {
+           priorYears
+       }
 }
 
 struct MarketParameters: Codable, Equatable {
@@ -882,8 +933,30 @@ struct HistoricalCrashAnalysis:
 
     let result: MarketRiskResult
     let cells: [MarketCell]
-    
-    let cellularStress: Double
+
+    // Year-by-year CA snapshots leading up to and including the
+    // crash year (the last frame has isCrashYear == true).
+    let frames: [HistoricalCAFrame]
+
+    // Derived from the result so it can never go out of sync
+    // (and so callers don't have to supply it separately).
+    var cellularStress: Double {
+        result.cellularStress
+    }
+
+    init(
+        year: Int,
+        intervalYears: Int,
+        result: MarketRiskResult,
+        cells: [MarketCell],
+        frames: [HistoricalCAFrame] = []
+    ) {
+        self.year = year
+        self.intervalYears = intervalYears
+        self.result = result
+        self.cells = cells
+        self.frames = frames
+    }
 }
 
 

@@ -419,6 +419,113 @@ struct ContentView: View {
     }
 
     // ========================================================
+    // MARK: - Historical Filmstrip
+    // ========================================================
+    //
+    // One mini lattice per simulated year, ending in the crash
+    // year (outlined), so the buildup and spread are visible as a
+    // progression instead of a single static picture.
+
+    private func historicalFilmstrip(
+        frames: [HistoricalCAFrame]
+    ) -> some View {
+
+        ScrollView(
+            .horizontal,
+            showsIndicators: false
+        ) {
+
+            HStack(
+                alignment: .top,
+                spacing: 10
+            ) {
+
+                ForEach(frames) { frame in
+
+                    VStack(spacing: 4) {
+
+                        miniCellGrid(
+                            cells: frame.cells
+                        )
+                        .overlay(
+                            RoundedRectangle(
+                                cornerRadius: 4
+                            )
+                            .stroke(
+                                frame.isCrashYear
+                                    ? Color.purple
+                                    : Color.clear,
+                                lineWidth: 2
+                            )
+                        )
+
+                        Text(
+                            frame.isCrashYear
+                                ? "\(frame.year) · CRASH"
+                                : "\(frame.year)"
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            frame.isCrashYear
+                                ? Color.purple
+                                : Color.secondary
+                        )
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private func miniCellGrid(
+        cells: [MarketCell],
+        size: CGFloat = 90
+    ) -> some View {
+
+        let width = max(
+            Int(
+                sqrt(
+                    Double(
+                        max(cells.count, 1)
+                    )
+                )
+            ),
+            1
+        )
+
+        return LazyVGrid(
+            columns: Array(
+                repeating:
+                    GridItem(
+                        .flexible(),
+                        spacing: 1
+                    ),
+                count: width
+            ),
+            spacing: 1
+        ) {
+
+            ForEach(cells) { cell in
+
+                Rectangle()
+                    .fill(
+                        cellColor(
+                            cell.state
+                        )
+                    )
+                    .aspectRatio(
+                        1,
+                        contentMode: .fit
+                    )
+            }
+        }
+        .frame(
+            width: size,
+            height: size
+        )
+    }
+
+    // ========================================================
     // MARK: - Cell Grid
     // ========================================================
 
@@ -1026,6 +1133,16 @@ struct ContentView: View {
             cellGrid(
                 cells: analysis.cells
             )
+
+            if analysis.frames.count > 1 {
+
+                Text("Propagation")
+                    .font(.subheadline.bold())
+
+                historicalFilmstrip(
+                    frames: analysis.frames
+                )
+            }
 
             HStack {
 
