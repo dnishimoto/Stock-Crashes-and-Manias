@@ -308,14 +308,16 @@ struct ContentView: View {
 
             if year == selectedYear {
                 currentInformationCard
-            } else if let historicalResult =
-                        historicalSimulationResults.first(where: {
-                            $0.year == year
-                        }) {
+            } else {
+                if let simulation =
+                    historicalSimulationResults.first(where: {
+                        $0.year == year
+                    }) {
 
-                historicalSimulationResultCard(
-                    historicalResult
-                )
+                    historicalSimulationResultCard(
+                        simulation
+                    )
+                }
             }
         }
     }

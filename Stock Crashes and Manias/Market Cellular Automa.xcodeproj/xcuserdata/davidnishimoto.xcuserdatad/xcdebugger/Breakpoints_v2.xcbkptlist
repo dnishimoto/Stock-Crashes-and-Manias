@@ -30,8 +30,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1857"
-            endingLineNumber = "1857"
+            startingLineNumber = "1859"
+            endingLineNumber = "1859"
             landmarkName = "loadHistoricalMatrix()"
             landmarkType = "7">
          </BreakpointContent>
@@ -46,8 +46,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1856"
-            endingLineNumber = "1856"
+            startingLineNumber = "1858"
+            endingLineNumber = "1858"
             landmarkName = "loadHistoricalMatrix()"
             landmarkType = "7">
          </BreakpointContent>
@@ -78,8 +78,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1858"
-            endingLineNumber = "1858"
+            startingLineNumber = "1860"
+            endingLineNumber = "1860"
             landmarkName = "loadHistoricalMatrix()"
             landmarkType = "7">
          </BreakpointContent>
