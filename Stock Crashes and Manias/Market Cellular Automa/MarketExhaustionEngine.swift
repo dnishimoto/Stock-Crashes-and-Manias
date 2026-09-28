@@ -14,6 +14,9 @@ import Combine
 @MainActor
 final class MarketExhaustionEngine: ObservableObject {
 
+
+
+
     // ========================================================
     // MARK: - Published Simulation State
     // ========================================================
@@ -71,7 +74,7 @@ final class MarketExhaustionEngine: ObservableObject {
 
         yearlyRiskHistory.removeAll(keepingCapacity: true)
         historicalFrames.removeAll(keepingCapacity: true)
-        historicalAnalyses.removeAll(keepingCapacity: true)
+        //historicalAnalyses.removeAll(keepingCapacity: true)
         caDynamicsHistory.removeAll(keepingCapacity: true)
 
         let width  = max(parameters.gridWidth, 1)
@@ -117,16 +120,16 @@ final class MarketExhaustionEngine: ObservableObject {
     // MARK: - Public Simulation
     // ========================================================
 
-    /// Runs the CA for the requested number of years.
+    /// Runs the cellular automaton for the requested number of iterations.
     @discardableResult
     func run(
-        years: Int,
+        iterations: Int,
         equilibriumPressure: Double,
         volumePressure: Double,
         scenario: MarketScenario = .neutral
     ) -> MarketRiskResult {
 
-        guard years > 0 else {
+        guard iterations > 0 else {
             return makeRiskResult(
                 year: 0,
                 equilibriumPressure: equilibriumPressure,
@@ -140,26 +143,22 @@ final class MarketExhaustionEngine: ObservableObject {
             volumePressure: volumePressure
         )
 
-        let generationsPerYear = max(parameters.generationsPerYear, 1)
-
-        for year in 1...years {
-            for _ in 0..<generationsPerYear {
-                stepCA(
-                    equilibriumPressure: equilibriumPressure,
-                    volumePressure: volumePressure,
-                    scenario: scenario
-                )
-            }
+        for iteration in 1...iterations {
+            stepCA(
+                equilibriumPressure: equilibriumPressure,
+                volumePressure: volumePressure,
+                scenario: scenario
+            )
 
             result = makeRiskResult(
-                year: year,
+                year: iteration,
                 equilibriumPressure: equilibriumPressure,
                 volumePressure: volumePressure
             )
 
             yearlyRiskHistory.append(
                 YearlyRiskSnapshot(
-                    year: year,
+                    year: iteration,
                     equilibriumPressure: result.equilibriumPressure,
                     volumePressure: result.volumePressure,
                     systemicRisk: result.systemicRisk,
@@ -174,7 +173,10 @@ final class MarketExhaustionEngine: ObservableObject {
             )
 
             caDynamicsHistory.append(
-                makeCADynamicsSnapshot(year: year, systemicRisk: result.systemicRisk)
+                makeCADynamicsSnapshot(
+                    year: iteration,
+                    systemicRisk: result.systemicRisk
+                )
             )
         }
 
@@ -316,6 +318,13 @@ final class MarketExhaustionEngine: ObservableObject {
         )
 
         historicalAnalyses.append(crashAnalysis)
+        
+        print("Years in historicalAnalyses:")
+
+        for analysis in historicalAnalyses {
+            print(analysis.year)
+        }
+        
         return crashAnalysis
     }
     /// Runs exactly one simulated year.
@@ -1032,6 +1041,7 @@ final class MarketExhaustionEngine: ObservableObject {
 
     @discardableResult
     func analyzeAllHistoricalCrashes() -> [HistoricalCrashAnalysis] {
+
         historicalAnalyses.removeAll(keepingCapacity: true)
         historicalFrames.removeAll(keepingCapacity: true)
         caDynamicsHistory.removeAll(keepingCapacity: true)
@@ -1039,8 +1049,12 @@ final class MarketExhaustionEngine: ObservableObject {
         for period in historicalData.crashPeriods {
             _ = analyzeHistoricalCrash(at: period)
         }
+
+  
+
         return historicalAnalyses
     }
+
 
 
 

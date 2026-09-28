@@ -1741,3 +1741,11 @@ let historicalMarketJSON = """
   ]
 }
 """
+
+struct HistoricalSimulationResult: Identifiable {
+    let id = UUID()
+    let year: Int
+    let result: MarketRiskResult
+    let cells: [MarketCell]
+}
+
