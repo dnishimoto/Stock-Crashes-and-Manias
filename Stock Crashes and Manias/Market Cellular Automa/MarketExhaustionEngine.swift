@@ -683,20 +683,23 @@ final class MarketExhaustionEngine: ObservableObject {
                 + (1.0 - updatedCapital) * 0.50
             )
 
-            let directExhaustion =
-                energyDepletion * parameters.energyDepletionStressWeight
-            let resourceExhaustion =
-                resourceDepletion * parameters.exhaustionAccumulationRate
-            let macroExhaustion =
-                macroStress * parameters.macroExhaustionRate
+            // Exhaustion relaxes toward a target set by this cell's own
+            // depletion, instead of accumulating forever. (Accumulating
+            // pinned every cell at 1.0 within a few generations, so it
+            // carried no information and lifted every cell equally.)
+            let exhaustionTarget = bounded(
+                energyDepletion * 0.45
+                + resourceDepletion * 0.35
+                + macroStress * 0.20
+            )
             let recovery =
-                updatedLiquidity * updatedCapital * parameters.exhaustionRecoveryRate
+                updatedLiquidity * updatedCapital
+                * parameters.exhaustionRecoveryRate
+                * (0.5 + cell.recoveryCapacity)
 
             let updatedExhaustion = bounded(
                 cell.exhaustion
-                + directExhaustion
-                + resourceExhaustion
-                + macroExhaustion
+                + (exhaustionTarget - cell.exhaustion) * 0.30
                 - recovery
             )
 
@@ -704,17 +707,17 @@ final class MarketExhaustionEngine: ObservableObject {
             // Stress
             // ------------------------------------------------
 
-            let energyStress = energyDepletion * parameters.energyWeight
+            let energyStress = energyDepletion * parameters.energyWeight * (0.5 + cell.fragility)
             let momentumStress = max(-updatedMomentum, 0.0) * parameters.momentumWeight
             let potentialStress = updatedPotential * parameters.potentialWeight
             let exhaustionStress = updatedExhaustion * parameters.exhaustionWeight
             let contagionStress = updatedContagion * parameters.contagionWeight
-            let macroStressComponent = macroStress * parameters.macroStressWeight
+            let macroStressComponent = macroStress * parameters.macroStressWeight * (0.5 + cell.macroExposure)
             let dissipationStress = dissipatedEnergy * parameters.energyDissipationWeight
             let potentialGradientStress =
                 abs(potentialGradient) * parameters.potentialWeight * 0.50
 
-            let noise = random.centeredUnit() * 0.02
+            let noise = random.centeredUnit() * 0.02 * (0.5 + cell.localShockSusceptibility)
 
             let rawStress =
                 energyStress
@@ -783,11 +786,11 @@ final class MarketExhaustionEngine: ObservableObject {
             // ------------------------------------------------
 
             let stateSignal = bounded(
-                (updatedStress
-                 + updatedExhaustion
-                 + updatedNonlinearAmplification
-                 + updatedLocalInstability
-                 + updatedContagion) / 5.0
+                0.50 * updatedStress
+                + 0.30 * updatedExhaustion
+                + 0.10 * updatedNonlinearAmplification
+                + 0.05 * updatedLocalInstability
+                + 0.05 * updatedContagion
             )
 
             let updatedState = classifyState(
@@ -1347,7 +1350,8 @@ final class MarketExhaustionEngine: ObservableObject {
         let normalizedStress = bounded(stress)
         let normalizedEnergy = bounded(energy)
 
-        if normalizedEnergy <= parameters.severeEnergyDepletionThreshold {
+        if normalizedEnergy <= parameters.severeEnergyDepletionThreshold
+            && normalizedStress >= parameters.stressedThreshold {
             return .crashed
         }
         if normalizedStress >= parameters.crashedThreshold  { return .crashed }
@@ -1591,16 +1595,18 @@ final class MarketExhaustionEngine: ObservableObject {
     // ========================================================
 
     private static func decodeHistoricalData(_ json: String) -> HistoricalJSONRoot {
-            guard let data = json.data(using: .utf8) else {
-                return HistoricalJSONRoot(crashPeriods: [])
-            }
-            do {
-                return try JSONDecoder().decode(HistoricalJSONRoot.self, from: data)
-            } catch {
-                assertionFailure("Historical market JSON failed to decode: \(error)")
-                return HistoricalJSONRoot(crashPeriods: [])
-            }
+        guard let data = json.data(using: .utf8) else {
+            return HistoricalJSONRoot(crashPeriods: [])
         }
+        do {
+            return try JSONDecoder().decode(HistoricalJSONRoot.self, from: data)
+        } catch {
+            // Print the real decoding error (missing key / type
+            // mismatch) instead of trapping, so the app still launches.
+            print("Historical market JSON failed to decode: \(error)")
+            return HistoricalJSONRoot(crashPeriods: [])
+        }
+    }
 }
 
 // ============================================================
