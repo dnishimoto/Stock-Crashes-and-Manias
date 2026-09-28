@@ -7,7 +7,8 @@ struct ContentView: View {
     @State private var historicalSimulationResults:
         [HistoricalSimulationResult] = []
     
-    @State private var selectedYear = 1907
+    @State private var selectedYear = 2026
+    
 
     // MARK: - 2026 / Current Scenario Inputs
 
@@ -133,7 +134,7 @@ struct ContentView: View {
                         spacing: 3
                     ) {
                         Text(
-                            "\(simulation.year) Cellular Automaton"
+                            "Historical \(simulation.year) Cellular Automaton"
                         )
                         .font(.headline)
 
@@ -351,11 +352,13 @@ struct ContentView: View {
 
             engine.resetCells()
 
-            let simulationResult = engine.run(
+            let simulationResult = engine.runYear(
+                year: year,
                 iterations: 100,
                 equilibriumPressure: equilibriumPressure,
                 volumePressure: volumePressure,
                 scenario: scenario
+            
             )
 
             let finalCells = engine.cells
@@ -1752,7 +1755,8 @@ struct ContentView: View {
          Add `year: Int` to MarketExhaustionEngine.run().
         */
 
-        result = engine.run(
+        result = engine.runYear(
+            year:selectedYear,
             iterations: 100,
             equilibriumPressure:
                 equilibriumPressure,

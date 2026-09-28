@@ -531,7 +531,7 @@ struct MarketParameters: Codable, Equatable {
     
     var gridWidth: Int = 32
     var gridHeight: Int = 32
-    var generationsPerYear: Int = 1
+    var generationsPerYear: Int = 10
     var randomSeed: UInt64 = 42
 
 

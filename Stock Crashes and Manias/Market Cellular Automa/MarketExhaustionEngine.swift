@@ -116,72 +116,8 @@ final class MarketExhaustionEngine: ObservableObject {
         }
     }
 
-    // ========================================================
-    // MARK: - Public Simulation
-    // ========================================================
-
     /// Runs the cellular automaton for the requested number of iterations.
-    @discardableResult
-    func run(
-        iterations: Int,
-        equilibriumPressure: Double,
-        volumePressure: Double,
-        scenario: MarketScenario = .neutral
-    ) -> MarketRiskResult {
-
-        guard iterations > 0 else {
-            return makeRiskResult(
-                year: 0,
-                equilibriumPressure: equilibriumPressure,
-                volumePressure: volumePressure
-            )
-        }
-
-        var result = makeRiskResult(
-            year: 0,
-            equilibriumPressure: equilibriumPressure,
-            volumePressure: volumePressure
-        )
-
-        for iteration in 1...iterations {
-            stepCA(
-                equilibriumPressure: equilibriumPressure,
-                volumePressure: volumePressure,
-                scenario: scenario
-            )
-
-            result = makeRiskResult(
-                year: iteration,
-                equilibriumPressure: equilibriumPressure,
-                volumePressure: volumePressure
-            )
-
-            yearlyRiskHistory.append(
-                YearlyRiskSnapshot(
-                    year: iteration,
-                    equilibriumPressure: result.equilibriumPressure,
-                    volumePressure: result.volumePressure,
-                    systemicRisk: result.systemicRisk,
-                    meanEnergy: result.meanEnergy,
-                    meanMomentum: result.meanMomentum,
-                    meanExhaustion: result.meanExhaustion,
-                    meanStress: result.meanStress,
-                    meanFinancialPotential: result.meanFinancialPotential,
-                    criticalFraction: result.criticalFraction,
-                    crashFraction: result.crashFraction
-                )
-            )
-
-            caDynamicsHistory.append(
-                makeCADynamicsSnapshot(
-                    year: iteration,
-                    systemicRisk: result.systemicRisk
-                )
-            )
-        }
-
-        return result
-    }
+    
     // ========================================================
     // MARK: - Historical Rows  (one CA run per crash year)
     // ========================================================
@@ -261,6 +197,7 @@ final class MarketExhaustionEngine: ObservableObject {
             // Run the CA for this year (generationsPerYear steps)
             finalResult = runYear(
                 year: historicalYear.year,
+                iterations: 100,
                 equilibriumPressure: equilibrium,
                 volumePressure: volume,
                 scenario: scenarioValue
@@ -291,6 +228,7 @@ final class MarketExhaustionEngine: ObservableObject {
         // into Crashed; nothing is scripted.
         let result = runYear(
             year: period.crashYear,
+            iterations: 100,
             equilibriumPressure: lastEquilibrium,
             volumePressure: lastVolume,
             scenario: lastScenario
@@ -327,53 +265,115 @@ final class MarketExhaustionEngine: ObservableObject {
         
         return crashAnalysis
     }
-    /// Runs exactly one simulated year.
+    
     @discardableResult
     func runYear(
-        year: Int,
-        equilibriumPressure: Double,
-        volumePressure: Double,
-        scenario: MarketScenario = .neutral
-    ) -> MarketRiskResult {
+            year : Int,
+            iterations: Int,
 
-        let generations = max(parameters.generationsPerYear, 1)
+            equilibriumPressure: Double,
 
-        for _ in 0..<generations {
-            stepCA(
-                equilibriumPressure: equilibriumPressure,
-                volumePressure: volumePressure,
-                scenario: scenario
-            )
-        }
+            volumePressure: Double,
 
-        let result = makeRiskResult(
-            year: year,
-            equilibriumPressure: equilibriumPressure,
-            volumePressure: volumePressure
-        )
+            scenario: MarketScenario = .neutral
 
-        yearlyRiskHistory.append(
-            YearlyRiskSnapshot(
+        ) -> MarketRiskResult {
+
+            guard iterations > 0 else {
+
+                return makeRiskResult(
+
+                    year: year,
+
+                    equilibriumPressure: equilibriumPressure,
+
+                    volumePressure: volumePressure
+
+                )
+
+            }
+
+            var result = makeRiskResult(
+
                 year: year,
-                equilibriumPressure: result.equilibriumPressure,
-                volumePressure: result.volumePressure,
-                systemicRisk: result.systemicRisk,
-                meanEnergy: result.meanEnergy,
-                meanMomentum: result.meanMomentum,
-                meanExhaustion: result.meanExhaustion,
-                meanStress: result.meanStress,
-                meanFinancialPotential: result.meanFinancialPotential,
-                criticalFraction: result.criticalFraction,
-                crashFraction: result.crashFraction
+
+                equilibriumPressure: equilibriumPressure,
+
+                volumePressure: volumePressure
+
             )
-        )
 
-        caDynamicsHistory.append(
-            makeCADynamicsSnapshot(year: year, systemicRisk: result.systemicRisk)
-        )
+            for iteration in 1...iterations {
 
-        return result
-    }
+                stepCA(
+
+                    equilibriumPressure: equilibriumPressure,
+
+                    volumePressure: volumePressure,
+
+                    scenario: scenario
+
+                )
+
+                result = makeRiskResult(
+
+                    year: iteration,
+
+                    equilibriumPressure: equilibriumPressure,
+
+                    volumePressure: volumePressure
+
+                )
+
+                yearlyRiskHistory.append(
+
+                    YearlyRiskSnapshot(
+
+                        year: iteration,
+
+                        equilibriumPressure: result.equilibriumPressure,
+
+                        volumePressure: result.volumePressure,
+
+                        systemicRisk: result.systemicRisk,
+
+                        meanEnergy: result.meanEnergy,
+
+                        meanMomentum: result.meanMomentum,
+
+                        meanExhaustion: result.meanExhaustion,
+
+                        meanStress: result.meanStress,
+
+                        meanFinancialPotential: result.meanFinancialPotential,
+
+                        criticalFraction: result.criticalFraction,
+
+                        crashFraction: result.crashFraction
+
+                    )
+
+                )
+
+                caDynamicsHistory.append(
+
+                    makeCADynamicsSnapshot(
+
+                        year: iteration,
+
+                        systemicRisk: result.systemicRisk
+
+                    )
+
+                )
+
+            }
+
+            return result
+
+        }
+    /// Runs exactly one simulated year.
+
 
     // ========================================================
     // MARK: - Core Cellular Automaton
