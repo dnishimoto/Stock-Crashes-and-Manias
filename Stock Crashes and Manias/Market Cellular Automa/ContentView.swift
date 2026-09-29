@@ -9,7 +9,7 @@ struct ContentView: View {
     @State private var historicalSimulationResults:
         [HistoricalSimulationResult] = []
     
-    @State private var currentYear = 2026
+   @State private var currentYear = 2026
     
     //@State private var currentCells : [MarketCell] = []
     
