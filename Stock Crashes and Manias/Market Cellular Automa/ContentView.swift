@@ -11,6 +11,8 @@ struct ContentView: View {
     
     @State private var currentYear = 2026
     
+    //@State private var currentCells : [MarketCell] = []
+    
 
     // MARK: - 2026 / Current Scenario Inputs
 /*
@@ -781,7 +783,7 @@ struct ContentView: View {
     }
 
     // MARK: - Cellular Automaton
-
+    /*
     private var cellularAutomatonCard: some View {
 
         VStack(
@@ -808,7 +810,7 @@ struct ContentView: View {
             )
 
             cellGrid(
-                cells: engine.cells
+                cells: currentCells
             )
 
             stateLegendView
@@ -821,6 +823,7 @@ struct ContentView: View {
             )
         )
     }
+     */
 
     // MARK: - Historical Crash Panel
 
@@ -960,10 +963,10 @@ struct ContentView: View {
     }
 
     // MARK: - Local Financial Structure
-
+/*
     private var localFinancialStructureCard: some View {
 
-        let cells = engine.cells
+        let cells = currentCells
 
         return VStack(
             alignment: .leading,
@@ -1037,7 +1040,7 @@ struct ContentView: View {
             )
         )
     }
-
+*/
     // MARK: - Financial Metric
 
     private func financialMetric(
@@ -1070,10 +1073,10 @@ struct ContentView: View {
     }
 
     // MARK: - Contagion
-
+/*
     private var contagionCard: some View {
 
-        let cells = engine.cells
+        let cells = currentCells
 
         return VStack(
             alignment: .leading,
@@ -1155,7 +1158,7 @@ struct ContentView: View {
             )
         )
     }
-
+*/
     // MARK: - Risk
 
     private func riskCard(
@@ -1241,10 +1244,10 @@ struct ContentView: View {
     }
 
     // MARK: - Dynamics
-
+/*
     private var dynamicsCard: some View {
 
-        let cells = engine.cells
+        let cells = currentCells
 
         return VStack(
             alignment: .leading,
@@ -1327,7 +1330,7 @@ struct ContentView: View {
             )
         )
     }
-
+*/
     // MARK: - Historical Filmstrip
 
     private func historicalFilmstrip(

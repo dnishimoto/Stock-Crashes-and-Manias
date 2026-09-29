@@ -16,7 +16,7 @@ final class MarketExhaustionEngine: ObservableObject {
     // MARK: - Published Simulation State
     // ========================================================
 
-    @Published var cells: [MarketCell] = []
+    //@Published var cells: [MarketCell] = []
 
     //@Published private(set) var yearlyRiskHistory: [YearlyRiskSnapshot] = []
     //@Published private(set) var historicalFrames: [HistoricalCAFrame] = []
@@ -38,12 +38,13 @@ final class MarketExhaustionEngine: ObservableObject {
     init(
         parameters: MarketParameters = MarketParameters(),
         historicalJSON: String = historicalMarketJSON
+        //,cells: inout [MarketCell]
     ) {
         self.parameters = parameters
         self.random = SplitMix64(seed: parameters.randomSeed)
         self.historicalData = Self.decodeHistoricalData(historicalJSON)
 
-        resetCells(&cells)
+        //resetCells(&cells)
     }
 
     // ========================================================
@@ -251,7 +252,6 @@ final class MarketExhaustionEngine: ObservableObject {
         frames.append(frame)
         
        
-        /*
         var index : Int = 1
 
         // Advance the same localized lattice year by year.
@@ -309,11 +309,7 @@ final class MarketExhaustionEngine: ObservableObject {
             await Task.yield()
         }
 
-        guard let finalResult else {
-            return nil
-        }
          
-        */
         guard let finalResult = finalResult else {
             return nil
         }
@@ -356,7 +352,8 @@ final class MarketExhaustionEngine: ObservableObject {
             var result = makeRiskResult(
                 year: year,
                 equilibriumPressure: equilibriumPressure,
-                volumePressure: volumePressure
+                volumePressure: volumePressure,
+                cells: &caCells
             )
 
             return result
@@ -365,7 +362,8 @@ final class MarketExhaustionEngine: ObservableObject {
         var result = makeRiskResult(
             year: year,
             equilibriumPressure: equilibriumPressure,
-            volumePressure: volumePressure
+            volumePressure: volumePressure,
+            cells: &caCells
         )
 
         for iteration in 1...iterations {
@@ -389,7 +387,8 @@ final class MarketExhaustionEngine: ObservableObject {
             result = makeRiskResult(
                 year: year,
                 equilibriumPressure: equilibriumPressure,
-                volumePressure: volumePressure
+                volumePressure: volumePressure,
+                cells: &caCells
             )
 /*
             yearlyRiskHistory.append(
@@ -1362,13 +1361,12 @@ final class MarketExhaustionEngine: ObservableObject {
             .sorted {
                 $0.year < $1.year
             }
-
-        guard points.count >= 1 else {
-            return 0.0
-        }
-
         let recent =
             points[points.count - 1]
+        
+        guard points.count > 1 else {
+            return recent.volumeMillions
+        }
 
         let previous =
             points[points.count - 2]
@@ -1922,8 +1920,9 @@ final class MarketExhaustionEngine: ObservableObject {
     private func makeRiskResult(
         year: Int,
         equilibriumPressure: Double,
-        volumePressure: Double
-    ) -> MarketRiskResult {
+        volumePressure: Double,
+        cells: inout [MarketCell]    ) -> MarketRiskResult
+    {
 
         let meanEnergy =
             mean(cells.map(\.energy))
@@ -2236,7 +2235,7 @@ final class MarketExhaustionEngine: ObservableObject {
     // ========================================================
     // MARK: - Precursor Signal
     // ========================================================
-
+/*
     func currentPrecursor(
         previousCells: [MarketCell]? = nil
     ) -> CAPrecursorSignal {
@@ -2313,7 +2312,7 @@ final class MarketExhaustionEngine: ObservableObject {
                 acceleration
         )
     }
-
+*/
     // ========================================================
     // MARK: - State Classification
     // ========================================================
@@ -2420,7 +2419,7 @@ final class MarketExhaustionEngine: ObservableObject {
     // ========================================================
     // MARK: - Current State Accessors
     // ========================================================
-
+/*
     func criticalCellFraction() -> Double {
         criticalCellFraction(cells)
     }
@@ -2452,6 +2451,7 @@ final class MarketExhaustionEngine: ObservableObject {
             )
         )
     }
+ 
 
     func currentSystemicRisk(
         equilibriumPressure: Double = 0.0,
@@ -2490,7 +2490,7 @@ final class MarketExhaustionEngine: ObservableObject {
             energy: 1.0
         )
     }
-
+*/
     // ========================================================
     // MARK: - Parameter Validation
     // ========================================================
