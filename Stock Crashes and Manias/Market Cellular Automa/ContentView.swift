@@ -350,10 +350,13 @@ struct ContentView: View {
                 1.0
             )
 
-            engine.resetCells()
+            //engine.resetCells()
+            
+            var caCells : [MarketCell] = []
 
             let simulationResult = engine.runYear(
                 year: year,
+                caCells: &caCells,
                 iterations: 100,
                 equilibriumPressure: equilibriumPressure,
                 volumePressure: volumePressure,
@@ -361,13 +364,13 @@ struct ContentView: View {
             
             )
 
-            let finalCells = engine.cells
+           
 
             historicalSimulationResults.append(
                 HistoricalSimulationResult(
                     year: year,
                     result: simulationResult,
-                    cells: finalCells
+                    cells: caCells
                 )
             )
         }
@@ -1735,28 +1738,12 @@ struct ContentView: View {
                 1.0
             )
 
-        engine.resetCells()
+        engine.resetCells(&engine.cells)
 
-        /*
-         IMPORTANT:
-
-         The engine currently needs a year-aware run method.
-
-         The desired call is:
-
-         result = engine.run(
-             iterations: 100,
-             year: year,
-             equilibriumPressure: equilibriumPressure,
-             volumePressure: volumePressure,
-             scenario: scenario
-         )
-
-         Add `year: Int` to MarketExhaustionEngine.run().
-        */
-
+    
         result = engine.runYear(
             year:selectedYear,
+            caCells: &engine.cells,
             iterations: 100,
             equilibriumPressure:
                 equilibriumPressure,

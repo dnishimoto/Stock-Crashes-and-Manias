@@ -30,8 +30,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1863"
-            endingLineNumber = "1863"
+            startingLineNumber = "1850"
+            endingLineNumber = "1850"
             landmarkName = "loadHistoricalMatrix()"
             landmarkType = "7">
          </BreakpointContent>
@@ -46,8 +46,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1862"
-            endingLineNumber = "1862"
+            startingLineNumber = "1849"
+            endingLineNumber = "1849"
             landmarkName = "loadHistoricalMatrix()"
             landmarkType = "7">
          </BreakpointContent>
@@ -78,8 +78,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1864"
-            endingLineNumber = "1864"
+            startingLineNumber = "1851"
+            endingLineNumber = "1851"
             landmarkName = "loadHistoricalMatrix()"
             landmarkType = "7">
          </BreakpointContent>
@@ -142,25 +142,9 @@
             filePath = "Market Cellular Automa/MarketExhaustionEngine.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1055"
-            endingLineNumber = "1055"
+            startingLineNumber = "1251"
+            endingLineNumber = "1251"
             landmarkName = "analyzeAllHistoricalCrashes()"
-            landmarkType = "7">
-         </BreakpointContent>
-      </BreakpointProxy>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
-         <BreakpointContent
-            uuid = "B87D600E-346D-43F0-9248-96863F6B1277"
-            shouldBeEnabled = "No"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            filePath = "Market Cellular Automa/MarketExhaustionEngine.swift"
-            startingColumnNumber = "9223372036854775807"
-            endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "266"
-            endingLineNumber = "266"
-            landmarkName = "analyzeHistoricalCrash(at:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -200,7 +184,7 @@
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
             uuid = "03423ED6-C73C-4CA1-8A55-02AB96C99D5F"
-            shouldBeEnabled = "No"
+            shouldBeEnabled = "Yes"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "Market Cellular Automa/ContentView.swift"
@@ -209,6 +193,100 @@
             startingLineNumber = "313"
             endingLineNumber = "313"
             landmarkName = "yearGroup(year:)"
+            landmarkType = "7">
+            <Locations>
+               <Location
+                  uuid = "03423ED6-C73C-4CA1-8A55-02AB96C99D5F - 3d5837bbeadb6b9c"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "closure #1 () -&gt; SwiftUI.TupleView&lt;(&lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.yearSectionHeader(year: Swift.Int, subtitle: Swift.String) -&gt; some&gt;&gt;.0, SwiftUI._ConditionalContent&lt;&lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.currentInformationCard : some&gt;&gt;.0, Swift.Optional&lt;&lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.historicalSimulationResultCard(Market_Cellular_Automa.HistoricalSimulationResult) -&gt; some&gt;&gt;.0&gt;&gt;)&gt; in Market_Cellular_Automa.ContentView.yearGroup(year: Swift.Int) -&gt; some"
+                  moduleName = "Market Cellular Automa.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/davidnishimoto/Desktop/Stock-Crashes-and-Manias/Stock%20Crashes%20and%20Manias/Market%20Cellular%20Automa/ContentView.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "314"
+                  endingLineNumber = "314">
+               </Location>
+               <Location
+                  uuid = "03423ED6-C73C-4CA1-8A55-02AB96C99D5F - edf7d3fb903c77e8"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "closure #1 (Market_Cellular_Automa.HistoricalSimulationResult) -&gt; Swift.Bool in closure #1 () -&gt; SwiftUI.TupleView&lt;(&lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.yearSectionHeader(year: Swift.Int, subtitle: Swift.String) -&gt; some&gt;&gt;.0, SwiftUI._ConditionalContent&lt;&lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.currentInformationCard : some&gt;&gt;.0, Swift.Optional&lt;&lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.historicalSimulationResultCard(Market_Cellular_Automa.HistoricalSimulationResult) -&gt; some&gt;&gt;.0&gt;&gt;)&gt; in Market_Cellular_Automa.ContentView.yearGroup(year: Swift.Int) -&gt; some"
+                  moduleName = "Market Cellular Automa.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/davidnishimoto/Desktop/Stock-Crashes-and-Manias/Stock%20Crashes%20and%20Manias/Market%20Cellular%20Automa/ContentView.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "314"
+                  endingLineNumber = "314">
+               </Location>
+            </Locations>
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "DBE05995-5247-4A74-9BA3-69CDF1A0AF30"
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Market Cellular Automa/MarketExhaustionEngine.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "1252"
+            endingLineNumber = "1252"
+            landmarkName = "analyzeAllHistoricalCrashes()"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "B491732F-E165-4DED-BDA6-2B5B71D6B4E2"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Market Cellular Automa/MarketExhaustionEngine.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "250"
+            endingLineNumber = "250"
+            landmarkName = "analyzeHistoricalCrash(at:)"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "C34C1CA4-3151-4492-BCA2-E471801C6E6F"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Market Cellular Automa/MarketExhaustionEngine.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "257"
+            endingLineNumber = "257"
+            landmarkName = "analyzeHistoricalCrash(at:)"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "6B6390AA-1C5E-492F-A2BB-F485F6114A47"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Market Cellular Automa/MarketExhaustionEngine.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "261"
+            endingLineNumber = "261"
+            landmarkName = "analyzeHistoricalCrash(at:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

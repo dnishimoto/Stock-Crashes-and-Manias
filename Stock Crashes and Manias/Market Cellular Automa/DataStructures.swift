@@ -288,7 +288,7 @@ struct MarketVolumePoint:
 
 
 
-struct MarketCell: Identifiable {
+struct MarketCell: Identifiable, Codable, Equatable  {
 
     let id: Int
 
@@ -854,11 +854,8 @@ struct CAPrecursorSignal {
 // MARK: - Market Risk Result
 // ============================================================
 
-struct MarketRiskResult:
-    Identifiable,
-    Codable,
-    Equatable
-{
+
+struct MarketRiskResult: Identifiable, Codable, Equatable {
 
     var id: Int {
         year
@@ -868,7 +865,6 @@ struct MarketRiskResult:
 
     let equilibriumPressure: Double
     let volumePressure: Double
-
     let meanEnergy: Double
     let meanMomentum: Double
     let meanExhaustion: Double
@@ -877,11 +873,14 @@ struct MarketRiskResult:
 
     let criticalFraction: Double
     let crashFraction: Double
-
     let systemicRisk: Double
+
     let riskLevel: MarketState
     let cellularStress: Double
+
+    var cells: [MarketCell]? = nil
 }
+
 
 
 // ============================================================
