@@ -218,7 +218,7 @@ final class MarketExhaustionEngine: ObservableObject {
             for: currentYear
         )
 
-        let volume = historicalVolumePressure(
+        let volume = currentVolumePressure(
             for: [currentYear],
             through: period.crashYear
         )
@@ -1317,6 +1317,23 @@ final class MarketExhaustionEngine: ObservableObject {
     // MARK: - Historical Volume Pressure
     // ========================================================
 
+    private func currentVolumePressure(
+        for years: [HistoricalYear],
+        through year: Int
+    ) -> Double {
+
+        guard
+            let volume = years
+                .first(where: { $0.year == year })?
+                .stockVolumeMillions,
+            volume.isFinite
+        else {
+            return 0.0
+        }
+
+        return volume
+    }
+    
     private func historicalVolumePressure(
         for years: [HistoricalYear],
         through year: Int
@@ -1346,7 +1363,7 @@ final class MarketExhaustionEngine: ObservableObject {
                 $0.year < $1.year
             }
 
-        guard points.count >= 2 else {
+        guard points.count >= 1 else {
             return 0.0
         }
 

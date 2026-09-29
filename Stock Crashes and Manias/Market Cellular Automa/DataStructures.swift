@@ -20,10 +20,8 @@ struct CrashRecord: Identifiable {
     let volumeMillions: Double
 }
 
-struct MarketScenario:
-    Codable,
-    Equatable
-{
+struct MarketScenario: Codable, Equatable {
+
     // --------------------------------------------------------
     // Money / monetary policy
     // --------------------------------------------------------
@@ -46,6 +44,12 @@ struct MarketScenario:
     var taxationGrowthPercent: Double = 0.0
 
     // --------------------------------------------------------
+    // Foreign investment
+    // --------------------------------------------------------
+
+    var foreignInvestmentPercent: Double = 0.0
+
+    // --------------------------------------------------------
     // Economic growth
     // --------------------------------------------------------
 
@@ -56,7 +60,6 @@ struct MarketScenario:
     // --------------------------------------------------------
 
     var stockGrowthPercent: Double = 0.0
-
     var previousStockGrowthPercent: Double = 0.0
 
     // --------------------------------------------------------
@@ -99,6 +102,7 @@ struct MarketScenario:
         moneySupplyChangePercent: Double = 0.0,
         inflationPercent: Double = 0.0,
         taxationGrowthPercent: Double = 0.0,
+        foreignInvestmentPercent: Double = 0.0,
         economicGrowthPercent: Double = 0.0,
         stockGrowthPercent: Double = 0.0,
         previousStockGrowthPercent: Double = 0.0,
@@ -115,6 +119,9 @@ struct MarketScenario:
 
         self.taxationGrowthPercent =
             taxationGrowthPercent
+
+        self.foreignInvestmentPercent =
+            foreignInvestmentPercent
 
         self.economicGrowthPercent =
             economicGrowthPercent
@@ -137,7 +144,30 @@ struct MarketScenario:
         self.externalShockMagnitudePercent =
             externalShockMagnitudePercent
     }
+
+    // --------------------------------------------------------
+    // Historical JSON mapping
+    // --------------------------------------------------------
+
+    enum CodingKeys: String, CodingKey {
+        case moneySupplyChangePercent
+        case inflationPercent
+
+        // Historical JSON uses "taxGrowthPercent"
+        case taxationGrowthPercent = "taxGrowthPercent"
+
+        case foreignInvestmentPercent
+        case economicGrowthPercent
+        case stockGrowthPercent
+        case previousStockGrowthPercent
+        case bondYieldAvgPercent
+        case bankingCreditStressRating
+        case moneyPolicyChangeImpact
+        case externalShockMagnitudePercent
+    }
 }
+
+
 
 
 // ============================================================
