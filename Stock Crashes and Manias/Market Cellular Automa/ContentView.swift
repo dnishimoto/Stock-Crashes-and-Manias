@@ -57,6 +57,8 @@ struct ContentView: View {
                 ) {
 
                     headerCard
+                    
+                    yearGroup(year: selectedYear)
 
                     ForEach(
                         allYears,
