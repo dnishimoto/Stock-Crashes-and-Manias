@@ -3,6 +3,8 @@ import Foundation
 
 struct ContentView: View {
 
+    @State private var isLoading = true
+    
     // MARK: - Selected Year
     @State private var historicalSimulationResults:
         [HistoricalSimulationResult] = []
@@ -95,17 +97,54 @@ struct ContentView: View {
                     }
                 }
             }
-
             .onAppear {
-                
-                loadHistoricalMatrix()
-                loadYears()
-                
-                runAllHistoricalYears()
-                
-                runSimulation(
-                        year: selectedYear
-                    )
+                isLoading = true
+
+                Task {
+                    await Task.yield()
+
+                    await loadHistoricalMatrix()
+                    loadYears()
+                    runAllHistoricalYears()
+                    runSimulation(year: selectedYear)
+
+                    isLoading = false
+                }
+            }
+            .overlay {
+                if isLoading {
+                    ZStack {
+                        Color.black
+                            .opacity(0.35)
+                            .ignoresSafeArea()
+
+                        VStack(spacing: 18) {
+                            ProgressView()
+                                .scaleEffect(1.4)
+
+                            Text("Calculating Market Simulation")
+                                .font(.headline)
+
+                            Text(
+                                "Historical cellular automa for \(String(engine.processingYear) ) is being calculated."
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+
+                            Text("This will take about 30 seconds.")
+                                .font(.subheadline.bold())
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(28)
+                        .frame(maxWidth: 320)
+                        .background(
+                            .regularMaterial,
+                            in: RoundedRectangle(cornerRadius: 20)
+                        )
+                        .shadow(radius: 20)
+                    }
+                }
             }
         }
     }
@@ -352,13 +391,9 @@ struct ContentView: View {
                 1.0
             )
 
-            //engine.resetCells()
-            
-            var caCells : [MarketCell] = []
 
             let simulationResult = engine.runYear(
                 year: year,
-                caCells: &caCells,
                 iterations: 100,
                 equilibriumPressure: equilibriumPressure,
                 volumePressure: volumePressure,
@@ -367,12 +402,15 @@ struct ContentView: View {
             )
 
            
+            guard let cells = simulationResult.cells else {
+                return
+            }
 
             historicalSimulationResults.append(
                 HistoricalSimulationResult(
                     year: year,
                     result: simulationResult,
-                    cells: caCells
+                    cells: cells
                 )
             )
         }
@@ -393,8 +431,10 @@ struct ContentView: View {
                 spacing: 3
             ) {
 
+               
+                
                 Text(
-                    "\(year)"
+                    "\(String(year))"
                 )
                 .font(
                     .title2.bold()
@@ -1740,12 +1780,9 @@ struct ContentView: View {
                 1.0
             )
 
-        engine.resetCells(&engine.cells)
-
     
         result = engine.runYear(
             year:selectedYear,
-            caCells: &engine.cells,
             iterations: 100,
             equilibriumPressure:
                 equilibriumPressure,
@@ -1754,6 +1791,12 @@ struct ContentView: View {
             scenario:
                 scenario
         )
+        guard let result = result,
+              let cells = result.cells else {
+            return
+        }
+
+        engine.cells = cells
     }
 
     // MARK: - Scenario For Year
@@ -1846,10 +1889,10 @@ struct ContentView: View {
 
     // MARK: - Historical Data
 
-    private func loadHistoricalMatrix() {
+    private func loadHistoricalMatrix() async {
 
         historicalAnalyses =
-            engine.analyzeAllHistoricalCrashes()
+            await engine.analyzeAllHistoricalCrashes()
     }
 
     // MARK: - Helpers

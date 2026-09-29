@@ -20,6 +20,8 @@ final class MarketExhaustionEngine: ObservableObject {
     // ========================================================
     // MARK: - Published Simulation State
     // ========================================================
+    
+    @Published var processingYear: Int = 1907
 
     @Published var cells: [MarketCell] = []
 
@@ -151,14 +153,14 @@ final class MarketExhaustionEngine: ObservableObject {
     }
    
 
-    func historicalCARows() -> [HistoricalCARow] {
+    func historicalCARows() async -> [HistoricalCARow] {
         var rows: [HistoricalCARow] = []
 
         // Loop crash year by crash year
         for period in historicalData.crashPeriods {
 
             // Independent CA run for THIS period only
-            guard let analysis = analyzeHistoricalCrash(at: period) else {
+            guard let analysis = await analyzeHistoricalCrash(at: period) else {
                 continue
             }
 
@@ -188,14 +190,15 @@ final class MarketExhaustionEngine: ObservableObject {
     @discardableResult
     func analyzeHistoricalCrash(
         at period: HistoricalCrashPeriod
-    ) -> HistoricalCrashAnalysis? {
+    ) async -> HistoricalCrashAnalysis? {
 
+
+      
         guard validateHistoricalCausality(period: period) else {
             return nil
         }
+  // Fresh lattice for this crash period only.
 
-        // Fresh lattice for this crash period only.
-        resetCells(&cells)
 
         // Only the prior years belonging to THIS crash period.
         let sortedYears = period.priorYears.sorted {
@@ -228,26 +231,26 @@ final class MarketExhaustionEngine: ObservableObject {
                 for: sortedYears,
                 through: historicalYear.year
             )
-            var caCells :[MarketCell] = []
-            resetCells(&caCells)
             // Run the CA for this historical year.
             finalResult = runYear(
                 year: historicalYear.year,
-                caCells: &caCells,
                 iterations: 100,
                 equilibriumPressure: equilibrium,
                 volumePressure: volume,
                 scenario: scenarioValue
             )
 
-            finalResult?.cells = caCells
+
+            guard let cells = finalResult?.cells else {
+                return nil
+            }
 
             let frame = HistoricalCAFrame(
                 year: historicalYear.year,
                 isCrashYear: false,
                 moneyEnergyChange: scenarioValue.moneySupplyChangePercent,
                 volumePressure: volume,
-                cells: caCells
+                cells: cells
             )
 
             frames.append(frame)
@@ -282,8 +285,11 @@ final class MarketExhaustionEngine: ObservableObject {
 
         for analysis in historicalAnalyses {
             print(analysis.year)
-        }
 
+            processingYear = analysis.year
+
+            await Task.yield()
+        }
         return crashAnalysis
     }
      
@@ -291,7 +297,6 @@ final class MarketExhaustionEngine: ObservableObject {
     func runYear(
 
             year : Int,
-            caCells : inout [MarketCell],
             iterations: Int,
 
             equilibriumPressure: Double,
@@ -301,6 +306,9 @@ final class MarketExhaustionEngine: ObservableObject {
             scenario: MarketScenario = .neutral
 
         ) -> MarketRiskResult {
+            
+            var caCells :[MarketCell] = []
+            resetCells(&caCells)
 
             guard iterations > 0 else {
 
@@ -394,7 +402,8 @@ final class MarketExhaustionEngine: ObservableObject {
  
                 
             }
-           
+        
+            result.cells = caCells
 
             return result
 
@@ -1236,14 +1245,14 @@ final class MarketExhaustionEngine: ObservableObject {
     // ========================================================
 
     @discardableResult
-    func analyzeAllHistoricalCrashes() -> [HistoricalCrashAnalysis] {
+    func analyzeAllHistoricalCrashes() async -> [HistoricalCrashAnalysis] {
 
         historicalAnalyses.removeAll(keepingCapacity: true)
         historicalFrames.removeAll(keepingCapacity: true)
         caDynamicsHistory.removeAll(keepingCapacity: true)
 
         for period in historicalData.crashPeriods {
-            _ = analyzeHistoricalCrash(at: period)
+            _ = await analyzeHistoricalCrash(at: period)
         }
 
   
@@ -1703,9 +1712,9 @@ final class MarketExhaustionEngine: ObservableObject {
 
     func makeHistoricalCAResult(
         for period: HistoricalCrashPeriod
-    ) -> HistoricalCAResult? {
+    ) async -> HistoricalCAResult? {
 
-        guard let analysis = analyzeHistoricalCrash(at: period) else { return nil }
+        guard let analysis = await analyzeHistoricalCrash(at: period) else { return nil }
 
         let result = analysis.result
         let latest = period.priorYears.sorted { $0.year < $1.year }.last
