@@ -1734,7 +1734,21 @@ let historicalMarketJSON = """
           "economicGrowthPercent": 5.8,
           "stockGrowthPercent": 28.7,
           "stockVolumeMillions": 4646000.0
-        }
+        },
+{
+  "year": 2026,
+  "bankingCreditStressRating": 5.0,
+  "m2Billions": 23342.8,
+  "m2GrowthPercent": 5.7,
+  "moneyPolicyChangeImpact": 4,
+  "inflationPercent": 3.3,
+  "bondYieldAvgPercent": 4.3,
+  "taxRevenueBillions": 4950.0,
+  "taxGrowthPercent": 5.0,
+  "economicGrowthPercent": 1.5,
+  "stockGrowthPercent": 12.0,
+  "stockVolumeMillions": 5000000.0
+}
       ]
     }
   ]
@@ -1745,6 +1759,5 @@ struct HistoricalSimulationResult: Identifiable {
     let id = UUID()
     let year: Int
     let result: MarketRiskResult
-    let cells: [MarketCell]
 }
 

@@ -13,7 +13,7 @@ struct ContentView: View {
     
 
     // MARK: - 2026 / Current Scenario Inputs
-
+/*
     @State private var growthM2 = 5.0
     @State private var moneyPolicyChangeImpact = 0.62
     @State private var bankingCreditStressRating = 2.0
@@ -26,6 +26,7 @@ struct ContentView: View {
     @State private var growthVolumePercent = 10.0
     @State private var crashInterval = 6.0
     @State private var externalShockPercent = 0.0
+ */
     @State private var allYears: [Int] = []
 
     // MARK: - Engine
@@ -60,22 +61,24 @@ struct ContentView: View {
 
                     headerCard
                     
-                    yearGroup(year: selectedYear)
-
-                    ForEach(
-                        allYears,
-                        id: \.self
-                    ) { year in
-                        yearGroup(
-                            year: year
-                        )
-                    }
+                    if (!isLoading)
+                    {
+                        yearGroup(year: selectedYear)
+                        
+                        ForEach(
+                            allYears,
+                            id: \.self
+                        ) { year in
+                            yearGroup(
+                                year: year
+                            )
+                        }}
                 }
                 .padding()
             }
             .navigationTitle(
                 "Stock Crashes and Manias"
-            )
+            )/*
             .toolbar {
 
                 ToolbarItem(
@@ -97,6 +100,7 @@ struct ContentView: View {
                     }
                 }
             }
+              */
             .onAppear {
                 isLoading = true
 
@@ -105,8 +109,8 @@ struct ContentView: View {
 
                     await loadHistoricalMatrix()
                     loadYears()
-                    runAllHistoricalYears()
-                    runSimulation(year: selectedYear)
+                    //runAllHistoricalYears()
+                    //runSimulation(year: selectedYear)
 
                     isLoading = false
                 }
@@ -126,7 +130,7 @@ struct ContentView: View {
                                 .font(.headline)
 
                             Text(
-                                "Historical cellular automa for \(String(engine.processingYear) ) is being calculated."
+                                "Historical cellular automa is being calculated."
                             )
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -152,7 +156,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private func historicalSimulationResultCard(
-        _ simulation: HistoricalSimulationResult
+        year : Int
     ) -> some View {
 
         VStack(
@@ -160,9 +164,11 @@ struct ContentView: View {
             spacing: 16
         ) {
 
-            // -----------------------------------------
-            // Simulation summary
-            // -----------------------------------------
+            if let analysis =
+                historicalAnalyses.first(where: {
+                    $0.year == year
+                }),
+               analysis.frames.count > 1 {
 
             VStack(
                 alignment: .leading,
@@ -175,7 +181,7 @@ struct ContentView: View {
                         spacing: 3
                     ) {
                         Text(
-                            "Historical \(simulation.year) Cellular Automaton"
+                            "Historical \(analysis.year) Cellular Automaton"
                         )
                         .font(.headline)
 
@@ -187,7 +193,7 @@ struct ContentView: View {
                     }
 
                     Spacer()
-
+                    /*
                     Text(
                         simulation.result.riskLevel.rawValue
                     )
@@ -197,8 +203,10 @@ struct ContentView: View {
                             simulation.result.systemicRisk
                         )
                     )
+                     */
                 }
-
+               
+                /*
                 HStack {
                     metric(
                         title: "Equilibrium",
@@ -231,10 +239,10 @@ struct ContentView: View {
                                 simulation.result.systemicRisk
                             )
                     )
-                }
+                }*/
 
                 Divider()
-
+                /*
                 HStack {
                     metric(
                         title: "Critical",
@@ -252,6 +260,7 @@ struct ContentView: View {
                             )
                     )
                 }
+                 */
             }
             .padding()
             .background(
@@ -278,9 +287,11 @@ struct ContentView: View {
                 )
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+ 
+
 
                 cellGrid(
-                    cells: simulation.cells
+                    cells: analysis.cells
                 )
 
                 stateLegendView
@@ -297,12 +308,7 @@ struct ContentView: View {
             // Historical propagation
             // -----------------------------------------
 
-            if let analysis =
-                historicalAnalyses.first(where: {
-                    $0.year == simulation.year
-                }),
-               analysis.frames.count > 1 {
-
+      
                 VStack(
                     alignment: .leading,
                     spacing: 10
@@ -328,9 +334,10 @@ struct ContentView: View {
             // Model pipeline
             // -----------------------------------------
 
-            modelPipelineCard(
+           /* modelPipelineCard(
                 year: simulation.year
             )
+            */
         }
     }
 
@@ -342,29 +349,30 @@ struct ContentView: View {
         ) {
             yearSectionHeader(
                 year: year,
-                subtitle:
-                    year == selectedYear
-                    ? "Current simulation year"
-                    : "Historical crash year"
+                subtitle: "Years to analyze"
             )
 
-            if year == selectedYear {
-                currentInformationCard
-            } else {
+          //  if year == selectedYear {
+           //     currentInformationCard
+          //  } else {
+            /*
                 if let simulation =
                     historicalSimulationResults.first(where: {
                         $0.year == year
                     }) {
 
-                    historicalSimulationResultCard(
-                        simulation
-                    )
-                }
+                   
+             */
+            ForEach(allYears, id: \.self) { year in
+                historicalSimulationResultCard(
+                    year: year
+                )
             }
+          //  }
         }
     }
 
-
+/*
     private func runAllHistoricalYears() {
 
         historicalSimulationResults.removeAll(
@@ -391,9 +399,11 @@ struct ContentView: View {
                 1.0
             )
 
+            var caCells :[MarketCell]=[]
 
             let simulationResult = engine.runYear(
                 year: year,
+                caCells: &caCells,
                 iterations: 100,
                 equilibriumPressure: equilibriumPressure,
                 volumePressure: volumePressure,
@@ -415,7 +425,7 @@ struct ContentView: View {
             )
         }
     }
-
+*/
 
     // MARK: - Year Header
 
@@ -480,7 +490,7 @@ struct ContentView: View {
     }
 
     // MARK: - Information Card
-
+/*
     private var currentInformationCard: some View {
 
         VStack(
@@ -514,6 +524,7 @@ struct ContentView: View {
             )
         }
     }
+ */
 
     // MARK: - Historical Information Card
 
@@ -594,7 +605,7 @@ struct ContentView: View {
     }
 
     // MARK: - Scenario Card
-
+/*
     private var scenarioCard: some View {
 
         VStack(
@@ -696,7 +707,7 @@ struct ContentView: View {
             )
         )
     }
-
+*/
     // MARK: - Scenario Value
 
     private func scenarioValue(
@@ -1745,14 +1756,15 @@ struct ContentView: View {
     }
 
     // MARK: - Run Selected Year
-
+/*
     private func rerunSelectedYear() {
 
         runSimulation(
             year: selectedYear
         )
     }
-
+ */
+/*
     private func runSimulation(
         year: Int
     ) {
@@ -1783,6 +1795,7 @@ struct ContentView: View {
     
         result = engine.runYear(
             year:selectedYear,
+            caCells: &engine.cells,
             iterations: 100,
             equilibriumPressure:
                 equilibriumPressure,
@@ -1791,16 +1804,12 @@ struct ContentView: View {
             scenario:
                 scenario
         )
-        guard let result = result,
-              let cells = result.cells else {
-            return
-        }
 
-        engine.cells = cells
+
     }
-
+*/
     // MARK: - Scenario For Year
-
+/*
     private func scenarioForYear(
         _ year: Int
     ) -> MarketScenario {
@@ -1886,6 +1895,7 @@ struct ContentView: View {
                 externalShockPercent
         )
     }
+ */
 
     // MARK: - Historical Data
 
