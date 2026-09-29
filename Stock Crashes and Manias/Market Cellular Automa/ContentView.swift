@@ -181,7 +181,7 @@ struct ContentView: View {
                         spacing: 3
                     ) {
                         Text(
-                            "Historical \(analysis.year) Cellular Automaton"
+                            "Historical \(String(analysis.year)) Cellular Automaton"
                         )
                         .font(.headline)
 
@@ -291,7 +291,7 @@ struct ContentView: View {
 
 
                 cellGrid(
-                    cells: analysis.cells
+                    cells: analysis.frames[analysis.frames.count-1].cells
                 )
 
                 stateLegendView
@@ -932,7 +932,7 @@ struct ContentView: View {
             )
 
             cellGrid(
-                cells: analysis.cells
+                cells: analysis.frames[analysis.frames.count-1].cells
             )
 
             stateLegendView

@@ -222,8 +222,8 @@
             filePath = "Market Cellular Automa/MarketExhaustionEngine.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "368"
-            endingLineNumber = "368"
+            startingLineNumber = "423"
+            endingLineNumber = "423"
             landmarkName = "runYear(year:caCells:iterations:equilibriumPressure:volumePressure:scenario:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -238,8 +238,8 @@
             filePath = "Market Cellular Automa/MarketExhaustionEngine.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "197"
-            endingLineNumber = "197"
+            startingLineNumber = "200"
+            endingLineNumber = "200"
             landmarkName = "analyzeHistoricalCrash(at:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -254,8 +254,24 @@
             filePath = "Market Cellular Automa/MarketExhaustionEngine.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "258"
-            endingLineNumber = "258"
+            startingLineNumber = "311"
+            endingLineNumber = "311"
+            landmarkName = "analyzeHistoricalCrash(at:)"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "1803F6EE-FA71-4A45-A526-855DAA9721A9"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Market Cellular Automa/MarketExhaustionEngine.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "255"
+            endingLineNumber = "255"
             landmarkName = "analyzeHistoricalCrash(at:)"
             landmarkType = "7">
          </BreakpointContent>

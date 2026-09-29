@@ -18,10 +18,10 @@ final class MarketExhaustionEngine: ObservableObject {
 
     @Published var cells: [MarketCell] = []
 
-    @Published private(set) var yearlyRiskHistory: [YearlyRiskSnapshot] = []
-    @Published private(set) var historicalFrames: [HistoricalCAFrame] = []
+    //@Published private(set) var yearlyRiskHistory: [YearlyRiskSnapshot] = []
+    //@Published private(set) var historicalFrames: [HistoricalCAFrame] = []
     @Published private(set) var historicalAnalyses: [HistoricalCrashAnalysis] = []
-    @Published private(set) var caDynamicsHistory: [CADynamicsSnapshot] = []
+    //@Published private(set) var caDynamicsHistory: [CADynamicsSnapshot] = []
 
     // ========================================================
     // MARK: - Canonical Configuration
@@ -54,9 +54,9 @@ final class MarketExhaustionEngine: ObservableObject {
 
         random = SplitMix64(seed: parameters.randomSeed)
 
-        yearlyRiskHistory.removeAll(keepingCapacity: true)
-        historicalFrames.removeAll(keepingCapacity: true)
-        caDynamicsHistory.removeAll(keepingCapacity: true)
+        //yearlyRiskHistory.removeAll(keepingCapacity: true)
+        //historicalFrames.removeAll(keepingCapacity: true)
+        //caDynamicsHistory.removeAll(keepingCapacity: true)
 
         let width = max(parameters.gridWidth, 1)
         let height = max(parameters.gridHeight, 1)
@@ -163,7 +163,7 @@ final class MarketExhaustionEngine: ObservableObject {
                     period: period,
                     analysis: historicalAnalysis,
                     result: analysis.result,
-                    cells: analysis.cells
+                    cells: analysis.frames[analysis.frames.count-1].cells
                 )
             )
         }
@@ -184,9 +184,12 @@ final class MarketExhaustionEngine: ObservableObject {
             return nil
         }
 
-        let sortedYears = period.priorYears.sorted { lhs, rhs in
+        
+        let sortedYears = (period.priorYears).sorted { lhs, rhs in
             lhs.year < rhs.year
         }
+        
+
 
         guard let lastHistoricalYear = sortedYears.last else {
             return nil
@@ -200,6 +203,53 @@ final class MarketExhaustionEngine: ObservableObject {
         var previousYear: HistoricalYear?
         var finalResult: MarketRiskResult?
         var frames: [HistoricalCAFrame] = []
+        
+        guard let currentYear = period.currentYear else {
+            return nil
+        }
+        
+        
+        let scenarioValue = scenario(
+            from: currentYear,
+            previousYear: previousYear
+        )
+
+        let equilibrium = historicalEquilibriumPressure(
+            for: currentYear
+        )
+
+        let volume = historicalVolumePressure(
+            for: sortedYears,
+            through: period.crashYear
+        )
+        
+        
+        let result = runYear(
+            year: period.crashYear,
+            caCells: &caCells,
+            iterations: 100,
+            equilibriumPressure: equilibrium,
+            volumePressure: volume,
+            scenario: scenarioValue
+        )
+        
+        guard let finalCells = result.cells else {
+            return nil
+        }
+
+        finalResult = result
+
+       
+        let frame = HistoricalCAFrame(
+            year: period.crashYear,
+            isCrashYear: true,
+            moneyEnergyChange: scenarioValue.moneySupplyChangePercent,
+            volumePressure: volume,
+            cells: finalCells
+        )
+         
+
+        frames.append(frame)
 
         // Advance the same localized lattice year by year.
         for historicalYear in sortedYears {
@@ -236,6 +286,7 @@ final class MarketExhaustionEngine: ObservableObject {
 
             finalResult = result
 
+           
             let frame = HistoricalCAFrame(
                 year: historicalYear.year,
                 isCrashYear: false,
@@ -243,8 +294,10 @@ final class MarketExhaustionEngine: ObservableObject {
                 volumePressure: volume,
                 cells: finalCells
             )
+             
 
             frames.append(frame)
+         
             previousYear = historicalYear
 
             caCells = finalCells
@@ -259,12 +312,11 @@ final class MarketExhaustionEngine: ObservableObject {
             year: period.crashYear,
             intervalYears: period.crashYear - lastHistoricalYear.year,
             result: finalResult,
-            cells: caCells,
             frames: frames
         )
 
         // Only publish completed results after all simulation years finish.
-        historicalFrames.append(contentsOf: frames)
+        //historicalFrames.append(contentsOf: frames)
         historicalAnalyses.append(crashAnalysis)
 
         return crashAnalysis
@@ -329,7 +381,7 @@ final class MarketExhaustionEngine: ObservableObject {
                 equilibriumPressure: equilibriumPressure,
                 volumePressure: volumePressure
             )
-
+/*
             yearlyRiskHistory.append(
                 YearlyRiskSnapshot(
                     year: iteration,
@@ -354,8 +406,10 @@ final class MarketExhaustionEngine: ObservableObject {
                     crashFraction:
                         result.crashFraction
                 )
-            )
 
+            )
+ */
+/*
             caDynamicsHistory.append(
                 makeCADynamicsSnapshot(
                     year: iteration,
@@ -363,6 +417,7 @@ final class MarketExhaustionEngine: ObservableObject {
                     cells: caCells
                 )
             )
+ */
         }
 
         result.cells = caCells
@@ -1579,13 +1634,13 @@ final class MarketExhaustionEngine: ObservableObject {
             keepingCapacity: true
         )
 
-        historicalFrames.removeAll(
-            keepingCapacity: true
-        )
+        //historicalFrames.removeAll(
+        //    keepingCapacity: true
+        //)
 
-        caDynamicsHistory.removeAll(
-            keepingCapacity: true
-        )
+        //caDynamicsHistory.removeAll(
+        //    keepingCapacity: true
+        //)
 
         for period in historicalData.crashPeriods {
 
@@ -2535,7 +2590,7 @@ final class MarketExhaustionEngine: ObservableObject {
     // ========================================================
     // MARK: - Detailed Historical CA Result
     // ========================================================
-
+/*
     func makeHistoricalCAResult(
         for period: HistoricalCrashPeriod
     ) async -> HistoricalCAResult? {
@@ -2649,7 +2704,7 @@ final class MarketExhaustionEngine: ObservableObject {
         // IMPORTANT:
         // Use the historical analysis lattice.
         let historicalCells =
-            analysis.cells
+        analysis.frames[analysis.frames.count-1].cells
 
         let financialPathForce =
             bounded(
@@ -2777,7 +2832,7 @@ final class MarketExhaustionEngine: ObservableObject {
                 analysis.cells
         )
     }
-
+*/
     // ========================================================
     // MARK: - Utility
     // ========================================================
