@@ -9,7 +9,7 @@ struct ContentView: View {
     @State private var historicalSimulationResults:
         [HistoricalSimulationResult] = []
     
-    @State private var selectedYear = 2026
+    @State private var currentYear = 2026
     
 
     // MARK: - 2026 / Current Scenario Inputs
@@ -63,7 +63,7 @@ struct ContentView: View {
                     
                     if (!isLoading)
                     {
-                        yearGroup(year: selectedYear)
+                        yearGroup(year: currentYear)
                         
                         ForEach(
                             allYears,
@@ -164,11 +164,11 @@ struct ContentView: View {
             spacing: 16
         ) {
 
-            if let analysis =
-                historicalAnalyses.first(where: {
-                    $0.year == year
-                }),
-               analysis.frames.count > 1 {
+            let analysis = historicalAnalyses.first(where: {
+                $0.year == year
+            })
+
+            if let analysis, analysis.frames.count >= 1 {
 
             VStack(
                 alignment: .leading,
@@ -206,13 +206,13 @@ struct ContentView: View {
                      */
                 }
                
-                /*
+              
                 HStack {
                     metric(
                         title: "Equilibrium",
                         value:
                             percent(
-                                simulation.result.equilibriumPressure
+                                analysis.result.equilibriumPressure
                             )
                     )
 
@@ -220,7 +220,7 @@ struct ContentView: View {
                         title: "Volume",
                         value:
                             percent(
-                                simulation.result.volumePressure
+                                analysis.result.volumePressure
                             )
                     )
 
@@ -228,7 +228,7 @@ struct ContentView: View {
                         title: "Cell Stress",
                         value:
                             percent(
-                                simulation.result.cellularStress
+                                analysis.result.cellularStress
                             )
                     )
 
@@ -236,10 +236,10 @@ struct ContentView: View {
                         title: "Systemic",
                         value:
                             percent(
-                                simulation.result.systemicRisk
+                                analysis.result.systemicRisk
                             )
                     )
-                }*/
+                }
 
                 Divider()
                 /*
@@ -363,10 +363,13 @@ struct ContentView: View {
 
                    
              */
-            ForEach(allYears, id: \.self) { year in
-                historicalSimulationResultCard(
+            if !isLoading {
+        
+                ForEach(allYears, id: \.self) { year in
+                    historicalSimulationResultCard(
                     year: year
-                )
+                    )
+                }
             }
           //  }
         }
@@ -458,30 +461,7 @@ struct ContentView: View {
                     .secondary
                 )
             }
-
-            Spacer()
-
-            if selectedYear == year {
-
-                Text("SELECTED")
-                    .font(
-                        .caption2.bold()
-                    )
-                    .padding(
-                        .horizontal,
-                        8
-                    )
-                    .padding(
-                        .vertical,
-                        4
-                    )
-                    .background(
-                        Color.accentColor.opacity(
-                            0.15
-                        ),
-                        in: Capsule()
-                    )
-            }
+  
         }
         .padding(
             .horizontal,

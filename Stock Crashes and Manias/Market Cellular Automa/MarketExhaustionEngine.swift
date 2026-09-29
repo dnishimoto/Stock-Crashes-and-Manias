@@ -136,7 +136,7 @@ final class MarketExhaustionEngine: ObservableObject {
             )
         }
     }
-
+/*
     // ========================================================
     // MARK: - Historical CA Rows
     // ========================================================
@@ -170,7 +170,7 @@ final class MarketExhaustionEngine: ObservableObject {
 
         return rows
     }
-
+*/
     // ========================================================
     // MARK: - Analyze One Historical Crash
     // ========================================================
@@ -219,7 +219,7 @@ final class MarketExhaustionEngine: ObservableObject {
         )
 
         let volume = historicalVolumePressure(
-            for: sortedYears,
+            for: [currentYear],
             through: period.crashYear
         )
         
@@ -227,29 +227,32 @@ final class MarketExhaustionEngine: ObservableObject {
         let result = runYear(
             year: period.crashYear,
             caCells: &caCells,
-            iterations: 100,
+            iterations: 50,
             equilibriumPressure: equilibrium,
             volumePressure: volume,
             scenario: scenarioValue
         )
         
+        finalResult = result
+        
         guard let finalCells = result.cells else {
             return nil
         }
-
-        finalResult = result
-
        
         let frame = HistoricalCAFrame(
+            index: 0,
             year: period.crashYear,
             isCrashYear: true,
             moneyEnergyChange: scenarioValue.moneySupplyChangePercent,
             volumePressure: volume,
             cells: finalCells
         )
-         
 
         frames.append(frame)
+        
+       
+        /*
+        var index : Int = 1
 
         // Advance the same localized lattice year by year.
         for historicalYear in sortedYears {
@@ -288,6 +291,7 @@ final class MarketExhaustionEngine: ObservableObject {
 
            
             let frame = HistoricalCAFrame(
+                index:index,
                 year: historicalYear.year,
                 isCrashYear: false,
                 moneyEnergyChange: scenarioValue.moneySupplyChangePercent,
@@ -297,6 +301,7 @@ final class MarketExhaustionEngine: ObservableObject {
              
 
             frames.append(frame)
+            index+=1
          
             previousYear = historicalYear
 
@@ -305,6 +310,11 @@ final class MarketExhaustionEngine: ObservableObject {
         }
 
         guard let finalResult else {
+            return nil
+        }
+         
+        */
+        guard let finalResult = finalResult else {
             return nil
         }
 

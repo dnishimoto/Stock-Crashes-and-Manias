@@ -1026,6 +1026,7 @@ struct HistoricalCAFrame:
         year
     }
 
+    let index: Int
     let year: Int
     let isCrashYear: Bool
 
