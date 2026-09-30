@@ -30,8 +30,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1888"
-            endingLineNumber = "1888"
+            startingLineNumber = "1935"
+            endingLineNumber = "1935"
             landmarkName = "loadHistoricalMatrix()"
             landmarkType = "7">
          </BreakpointContent>
@@ -46,8 +46,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1887"
-            endingLineNumber = "1887"
+            startingLineNumber = "1934"
+            endingLineNumber = "1934"
             landmarkName = "loadHistoricalMatrix()"
             landmarkType = "7">
          </BreakpointContent>
@@ -78,8 +78,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1889"
-            endingLineNumber = "1889"
+            startingLineNumber = "1936"
+            endingLineNumber = "1936"
             landmarkName = "loadHistoricalMatrix()"
             landmarkType = "7">
          </BreakpointContent>
@@ -110,8 +110,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "366"
-            endingLineNumber = "366"
+            startingLineNumber = "323"
+            endingLineNumber = "323"
             landmarkName = "yearGroup(year:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -126,8 +126,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "362"
-            endingLineNumber = "362"
+            startingLineNumber = "319"
+            endingLineNumber = "319"
             landmarkName = "yearGroup(year:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -142,8 +142,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "361"
-            endingLineNumber = "361"
+            startingLineNumber = "318"
+            endingLineNumber = "318"
             landmarkName = "yearGroup(year:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -158,8 +158,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "295"
-            endingLineNumber = "295"
+            startingLineNumber = "250"
+            endingLineNumber = "250"
             landmarkName = "historicalSimulationResultCard(year:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -174,8 +174,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "491"
-            endingLineNumber = "491"
+            startingLineNumber = "448"
+            endingLineNumber = "448"
             landmarkName = "ContentView"
             landmarkType = "14">
          </BreakpointContent>
@@ -190,8 +190,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "358"
-            endingLineNumber = "358"
+            startingLineNumber = "315"
+            endingLineNumber = "315"
             landmarkName = "yearGroup(year:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -206,8 +206,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "186"
-            endingLineNumber = "186"
+            startingLineNumber = "161"
+            endingLineNumber = "161"
             landmarkName = "historicalSimulationResultCard(year:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -280,14 +280,14 @@
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
             uuid = "F4A86893-E77E-4808-9A1E-FF1E4C8E4D19"
-            shouldBeEnabled = "Yes"
+            shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "918"
-            endingLineNumber = "918"
+            startingLineNumber = "875"
+            endingLineNumber = "875"
             landmarkName = "historicalCrashPanel(_:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -302,10 +302,40 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "879"
-            endingLineNumber = "879"
+            startingLineNumber = "836"
+            endingLineNumber = "836"
             landmarkName = "historicalCrashPanel(_:)"
             landmarkType = "7">
+            <Locations>
+               <Location
+                  uuid = "50A1369A-3D62-4878-994F-385D5AE28898 - 54ace7539ccdcd55"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "closure #2 () -&gt; SwiftUI.TupleView&lt;(&lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0)&gt; in closure #1 () -&gt; SwiftUI.TupleView&lt;(SwiftUI.HStack&lt;SwiftUI.TupleView&lt;(SwiftUI.VStack&lt;SwiftUI.TupleView&lt;(SwiftUI.Text, SwiftUI.Text)&gt;&gt;, SwiftUI.Spacer, SwiftUI.Text)&gt;&gt;, SwiftUI.HStack&lt;SwiftUI.TupleView&lt;(&lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0)&gt;&gt;, SwiftUI.Divider, SwiftUI.Text, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.cellGrid(cells: Swift.Array&lt;Market_Cellular_Automa.MarketCell&gt;) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.stateLegendView : some&gt;&gt;.0, Swift.Optional&lt;SwiftUI.TupleView&lt;(SwiftUI.Text, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.historicalFilmstrip(frames: Swift.Array&lt;Market_Cellular_Automa.HistoricalCAFrame&gt;) -&gt; some&gt;&gt;.0)&gt;&gt;, SwiftUI.HStack&lt;SwiftUI.TupleView&lt;(&lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0)&gt;&gt;, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.riskCard(analysis: Market_Cellular_Automa.HistoricalCrashAnalysis) -&gt; some&gt;&gt;.0)&gt; in Market_Cellular_Automa.ContentView.historicalCrashPanel(Market_Cellular_Automa.HistoricalCrashAnalysis) -&gt; some"
+                  moduleName = "Market Cellular Automa.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/davidnishimoto/Desktop/Stock-Crashes-and-Manias/Stock%20Crashes%20and%20Manias/Market%20Cellular%20Automa/ContentView.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "836"
+                  endingLineNumber = "836">
+               </Location>
+               <Location
+                  uuid = "50A1369A-3D62-4878-994F-385D5AE28898 - cea3fda303a31f31"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "closure #2 () -&gt; SwiftUI.TupleView&lt;(&lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0)&gt; in closure #1 () -&gt; SwiftUI.TupleView&lt;(SwiftUI.HStack&lt;SwiftUI.TupleView&lt;(SwiftUI.VStack&lt;SwiftUI.TupleView&lt;(SwiftUI.Text, SwiftUI.Text)&gt;&gt;, SwiftUI.Spacer, SwiftUI.Text)&gt;&gt;, SwiftUI.HStack&lt;SwiftUI.TupleView&lt;(&lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0)&gt;&gt;, SwiftUI.Divider, SwiftUI.Text, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.cellGrid(cells: Swift.Array&lt;Market_Cellular_Automa.MarketCell&gt;) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.stateLegendView : some&gt;&gt;.0, Swift.Optional&lt;SwiftUI.TupleView&lt;(SwiftUI.Text, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.historicalFilmstrip(frames: Swift.Array&lt;Market_Cellular_Automa.HistoricalCAFrame&gt;) -&gt; some&gt;&gt;.0)&gt;&gt;, SwiftUI.HStack&lt;SwiftUI.TupleView&lt;(&lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.metric(title: Swift.String, value: Swift.String) -&gt; some&gt;&gt;.0)&gt;&gt;, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.contagionCard(analysis: Market_Cellular_Automa.HistoricalCrashAnalysis) -&gt; some&gt;&gt;.0, &lt;&lt;opaque return type of Market_Cellular_Automa.ContentView.riskCard(analysis: Market_Cellular_Automa.HistoricalCrashAnalysis) -&gt; some&gt;&gt;.0)&gt; in Market_Cellular_Automa.ContentView.historicalCrashPanel(Market_Cellular_Automa.HistoricalCrashAnalysis) -&gt; some"
+                  moduleName = "Market Cellular Automa.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/davidnishimoto/Desktop/Stock-Crashes-and-Manias/Stock%20Crashes%20and%20Manias/Market%20Cellular%20Automa/ContentView.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "836"
+                  endingLineNumber = "836">
+               </Location>
+            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -380,8 +410,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "371"
-            endingLineNumber = "371"
+            startingLineNumber = "328"
+            endingLineNumber = "328"
             landmarkName = "yearGroup(year:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -396,8 +426,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "169"
-            endingLineNumber = "169"
+            startingLineNumber = "144"
+            endingLineNumber = "144"
             landmarkName = "historicalSimulationResultCard(year:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -444,8 +474,8 @@
             filePath = "Market Cellular Automa/ContentView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "173"
-            endingLineNumber = "173"
+            startingLineNumber = "148"
+            endingLineNumber = "148"
             landmarkName = "historicalSimulationResultCard(year:)"
             landmarkType = "7">
          </BreakpointContent>

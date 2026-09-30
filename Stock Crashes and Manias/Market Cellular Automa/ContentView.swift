@@ -80,29 +80,7 @@ struct ContentView: View {
             }
             .navigationTitle(
                 "Stock Crashes and Manias"
-            )/*
-            .toolbar {
-
-                ToolbarItem(
-                    placement: .topBarTrailing
-                ) {
-
-                    Button {
-
-                        runSimulation(
-                            year: selectedYear
-                        )
-
-                    } label: {
-
-                        Image(
-                            systemName:
-                                "arrow.clockwise"
-                        )
-                    }
-                }
-            }
-              */
+            )
             .onAppear {
                 isLoading = true
 
@@ -111,9 +89,6 @@ struct ContentView: View {
 
                     await loadHistoricalMatrix()
                     loadYears()
-                    //runAllHistoricalYears()
-                    //runSimulation(year: selectedYear)
-
                     isLoading = false
                 }
             }
@@ -243,26 +218,6 @@ struct ContentView: View {
                     )
                 }
 
-                Divider()
-                /*
-                HStack {
-                    metric(
-                        title: "Critical",
-                        value:
-                            percent(
-                                simulation.result.criticalFraction
-                            )
-                    )
-
-                    metric(
-                        title: "Crashed",
-                        value:
-                            percent(
-                                simulation.result.crashFraction
-                            )
-                    )
-                }
-                 */
             }
             .padding()
             .background(
@@ -297,6 +252,8 @@ struct ContentView: View {
                 )
 
                 stateLegendView
+                Divider()
+                riskCard(analysis: analysis)
             }
             .padding()
             .background(
@@ -952,6 +909,10 @@ struct ContentView: View {
                         )
                 )
             }
+            
+            contagionCard(analysis: analysis)
+            // Insert riskCard here using analysis (updated call site)
+            riskCard(analysis: analysis)
         }
         .padding()
         .background(
@@ -1073,71 +1034,119 @@ struct ContentView: View {
     }
 
     // MARK: - Contagion
-/*
-    private var contagionCard: some View {
+    private func contagionCard(
+        analysis: HistoricalCrashAnalysis
+    ) -> some View {
+        let cells = analysis.frames[analysis.frames.count-1].cells
 
-        let cells = currentCells
+        let columns = Array(
+            repeating: GridItem(
+                .flexible(),
+                spacing: 2
+            ),
+            count: 12
+        )
 
         return VStack(
             alignment: .leading,
             spacing: 10
         ) {
+            Text("Contagion")
+                .font(.headline)
 
-            Text(
-                "Contagion"
-            )
-            .font(.headline)
-
-            HStack {
-
+            HStack(spacing: 8) {
                 metric(
                     title: "Mean Contagion",
-                    value:
-                        percent(
-                            mean(
-                                cells.map {
-                                    $0.contagion
-                                }
-                            )
+                    value: percent(
+                        mean(
+                            cells.map(\.contagion)
                         )
+                    )
                 )
 
                 metric(
                     title: "Stressed",
-                    value:
-                        percent(
-                            fraction(
-                                cells
-                            ) {
-                                $0.state == .stressed
-                            }
-                        )
+                    value: percent(
+                        fraction(cells) {
+                            $0.state == .stressed
+                        }
+                    )
                 )
 
                 metric(
                     title: "Critical",
-                    value:
-                        percent(
-                            fraction(
-                                cells
-                            ) {
-                                $0.state == .critical
-                            }
-                        )
+                    value: percent(
+                        fraction(cells) {
+                            $0.state == .critical
+                        }
+                    )
                 )
 
                 metric(
                     title: "Crashed",
-                    value:
-                        percent(
-                            fraction(
-                                cells
-                            ) {
-                                $0.state == .crashed
-                            }
-                        )
+                    value: percent(
+                        fraction(cells) {
+                            $0.state == .crashed
+                        }
+                    )
                 )
             }
+
+            LazyVGrid(
+                columns: columns,
+                spacing: 2
+            ) {
+                ForEach(
+                    Array(cells.enumerated()),
+                    id: \.offset
+                ) { _, cell in
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(
+                            contagionColor(
+                                for: cell
+                            )
+                        )
+                        .aspectRatio(
+                            1,
+                            contentMode: .fit
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 2)
+                                .stroke(
+                                    .white.opacity(0.10),
+                                    lineWidth: 0.5
+                                )
+                        }
+                        .accessibilityLabel(
+                            "Contagion \(percent(cell.contagion))"
+                        )
+                }
+            }
+            .frame(maxWidth: .infinity)
+
+            HStack(spacing: 12) {
+                contagionLegend(
+                    color: .green,
+                    label: "Low"
+                )
+
+                contagionLegend(
+                    color: .yellow,
+                    label: "Stressed"
+                )
+
+                contagionLegend(
+                    color: .orange,
+                    label: "Critical"
+                )
+
+                contagionLegend(
+                    color: .red,
+                    label: "Crashed"
+                )
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
 
             Text(
                 """
@@ -1146,9 +1155,7 @@ struct ContentView: View {
                 """
             )
             .font(.footnote)
-            .foregroundStyle(
-                .secondary
-            )
+            .foregroundStyle(.secondary)
         }
         .padding()
         .background(
@@ -1158,11 +1165,51 @@ struct ContentView: View {
             )
         )
     }
-*/
+    private func contagionLegend(
+        color: Color,
+        label: String
+    ) -> some View {
+        HStack(spacing: 4) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(color)
+                .frame(
+                    width: 10,
+                    height: 10
+                )
+
+            Text(label)
+        }
+    }
+    private func contagionColor(
+        for cell: MarketCell
+    ) -> Color {
+        switch cell.state {
+        case .crashed:
+            return .red
+
+        case .critical:
+            return .orange
+
+        case .stressed:
+            return .yellow
+
+        default:
+            let contagion = min(
+                max(cell.contagion, 0.0),
+                1.0
+            )
+
+            return Color(
+                red: contagion,
+                green: 0.85 - (contagion * 0.55),
+                blue: 0.20 - (contagion * 0.15)
+            )
+        }
+    }
     // MARK: - Risk
 
     private func riskCard(
-        _ result: MarketRiskResult
+        analysis: HistoricalCrashAnalysis
     ) -> some View {
 
         VStack(
@@ -1179,7 +1226,7 @@ struct ContentView: View {
 
                 Text(
                     percent(
-                        result.systemicRisk
+                        analysis.result.systemicRisk
                     )
                 )
                 .font(
@@ -1190,12 +1237,12 @@ struct ContentView: View {
                 Spacer()
 
                 Text(
-                    result.riskLevel.rawValue
+                    analysis.result.riskLevel.rawValue
                 )
                 .font(.headline)
                 .foregroundStyle(
                     riskColor(
-                        result.systemicRisk
+                        analysis.result.systemicRisk
                     )
                 )
             }
@@ -1203,7 +1250,7 @@ struct ContentView: View {
             ProgressView(
                 value:
                     bounded(
-                        result.systemicRisk
+                        analysis.result.systemicRisk
                     )
             )
 
@@ -1213,7 +1260,7 @@ struct ContentView: View {
                     title: "Cellular Stress",
                     value:
                         percent(
-                            result.cellularStress
+                            analysis.result.cellularStress
                         )
                 )
 
@@ -1221,7 +1268,7 @@ struct ContentView: View {
                     title: "Critical Cells",
                     value:
                         percent(
-                            result.criticalFraction
+                            analysis.result.criticalFraction
                         )
                 )
 
@@ -1229,7 +1276,7 @@ struct ContentView: View {
                     title: "Crashed Cells",
                     value:
                         percent(
-                            result.crashFraction
+                            analysis.result.crashFraction
                         )
                 )
             }
@@ -1956,3 +2003,4 @@ struct ContentView: View {
 #Preview {
     ContentView()
 }
+

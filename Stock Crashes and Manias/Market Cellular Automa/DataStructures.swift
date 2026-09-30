@@ -740,7 +740,7 @@ struct MarketParameters: Codable, Equatable {
     // --------------------------------------------------------
 
     var risingThreshold: Double = 0.25
-    var stressedThreshold: Double = 0.50
+    var stressedThreshold: Double = 0.40 // Default: 0.40 (was 0.50)
     var criticalThreshold: Double = 0.75
     var crashedThreshold: Double = 0.95
 
@@ -1991,4 +1991,5 @@ struct HistoricalSimulationResult: Identifiable {
     let year: Int
     let result: MarketRiskResult
 }
+
 
