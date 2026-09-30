@@ -194,7 +194,7 @@ final class MarketExhaustionEngine: ObservableObject {
         let result = runYear(
             year: period.crashYear,
             caCells: &caCells,
-            iterations: 50,
+            iterations: 10,
             equilibriumPressure: equilibrium,
             volumePressure: volume,
             scenario: scenarioValue
@@ -244,7 +244,7 @@ final class MarketExhaustionEngine: ObservableObject {
             let result = runYear(
                 year: historicalYear.year,
                 caCells: &caCells,
-                iterations: 100,
+                iterations: 10,
                 equilibriumPressure: equilibrium,
                 volumePressure: volume,
                 scenario: scenarioValue

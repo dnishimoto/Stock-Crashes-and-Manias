@@ -236,7 +236,7 @@ struct ContentView: View {
 
                 stateLegendView
                 Divider()
-                contagionCard(analysis:analysis)
+                //contagionCard(analysis:analysis)
                 scenarioCard(analysis: analysis)
                 riskCard(analysis: analysis)
             }
@@ -857,7 +857,7 @@ struct ContentView: View {
                 )
             }
             
-            contagionCard(analysis: analysis)
+            //contagionCard(analysis: analysis)
             scenarioCard(analysis: analysis)
             riskCard(analysis: analysis)
         }
@@ -979,42 +979,40 @@ struct ContentView: View {
             )
         }
     }
-
-    // MARK: - Contagion
-  
-    // MARK: - Contagion
+/*
     private func contagionCard(
         analysis: HistoricalCrashAnalysis
     ) -> some View {
-        let cells = analysis.frames[analysis.frames.count-1].cells
+
+        let cells = analysis.frames.last?.cells ?? []
 
         let columns = Array(
             repeating: GridItem(
-                .flexible(),
-                spacing: 2
+                .fixed(8),
+                spacing: 1
             ),
             count: 12
         )
 
         return VStack(
             alignment: .leading,
-            spacing: 10
+            spacing: 4
         ) {
-            Text("Contagion")
-                .font(.headline)
 
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
+
+                Text("Contagion")
+                    .font(.caption.bold())
+
                 metric(
-                    title: "Mean Contagion",
+                    title: "Mean",
                     value: percent(
-                        mean(
-                            cells.map(\.contagion)
-                        )
+                        mean(cells.map(\.contagion))
                     )
                 )
 
                 metric(
-                    title: "Stressed",
+                    title: "S",
                     value: percent(
                         fraction(cells) {
                             $0.state == .stressed
@@ -1023,7 +1021,7 @@ struct ContentView: View {
                 )
 
                 metric(
-                    title: "Critical",
+                    title: "C",
                     value: percent(
                         fraction(cells) {
                             $0.state == .critical
@@ -1032,85 +1030,54 @@ struct ContentView: View {
                 )
 
                 metric(
-                    title: "Crashed",
+                    title: "X",
                     value: percent(
                         fraction(cells) {
                             $0.state == .crashed
                         }
                     )
                 )
+
+                Spacer()
+
+                HStack(spacing: 3) {
+                    contagionLegend(color: .green, label: "")
+                    contagionLegend(color: .yellow, label: "")
+                    contagionLegend(color: .orange, label: "")
+                    contagionLegend(color: .red, label: "")
+                }
             }
 
+            // Compact 12 × 12 lattice
             LazyVGrid(
                 columns: columns,
-                spacing: 2
+                spacing: 1
             ) {
                 ForEach(
                     Array(cells.enumerated()),
                     id: \.offset
                 ) { _, cell in
-                    RoundedRectangle(cornerRadius: 2)
+
+                    Rectangle()
                         .fill(
-                            contagionColor(
-                                for: cell
-                            )
+                            contagionColor(for: cell)
                         )
-                        .aspectRatio(
-                            1,
-                            contentMode: .fit
-                        )
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 2)
-                                .stroke(
-                                    .white.opacity(0.10),
-                                    lineWidth: 0.5
-                                )
-                        }
-                        .accessibilityLabel(
-                            "Contagion \(percent(cell.contagion))"
+                        .frame(
+                            width: 8,
+                            height: 8
                         )
                 }
             }
-            .frame(maxWidth: .infinity)
-
-            HStack(spacing: 12) {
-                contagionLegend(
-                    color: .green,
-                    label: "Low"
-                )
-
-                contagionLegend(
-                    color: .yellow,
-                    label: "Stressed"
-                )
-
-                contagionLegend(
-                    color: .orange,
-                    label: "Critical"
-                )
-
-                contagionLegend(
-                    color: .red,
-                    label: "Crashed"
-                )
-            }
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-
-            Text(
-                """
-                Contagion is transmitted from neighboring market cells.
-                Local vulnerability amplifies transmitted stress.
-                """
+            .frame(
+                width: 12 * 8 + 11,
+                height: 12 * 8 + 11
             )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
         }
-        .padding()
+        .padding(6)
         .background(
             .thinMaterial,
             in: RoundedRectangle(
-                cornerRadius: 16
+                cornerRadius: 8
             )
         )
     }
@@ -1129,6 +1096,7 @@ struct ContentView: View {
             Text(label)
         }
     }
+ */
     private func contagionColor(
         for cell: MarketCell
     ) -> Color {
@@ -1445,10 +1413,7 @@ struct ContentView: View {
             Int(
                 sqrt(
                     Double(
-                        max(
-                            cells.count,
-                            1
-                        )
+                        max(cells.count, 1)
                     )
                 )
             ),
@@ -1457,38 +1422,31 @@ struct ContentView: View {
 
         return LazyVGrid(
             columns: Array(
-                repeating:
-                    GridItem(
-                        .flexible(),
-                        spacing: 2
-                    ),
+                repeating: GridItem(
+                    .flexible(),
+                    spacing: 1
+                ),
                 count: width
             ),
-            spacing: 2
+            spacing: 1
         ) {
 
             ForEach(cells) { cell in
 
-                RoundedRectangle(
-                    cornerRadius: 2
-                )
-                .fill(
-                    cellColor(
-                        cell.state
+                Rectangle()
+                    .fill(
+                        cellColor(
+                            cell.state
+                        )
                     )
-                )
-                .aspectRatio(
-                    1,
-                    contentMode: .fit
-                )
+                    .aspectRatio(
+                        1,
+                        contentMode: .fit
+                    )
             }
         }
         .frame(
             maxWidth: .infinity
-        )
-        .aspectRatio(
-            1,
-            contentMode: .fit
         )
     }
 
