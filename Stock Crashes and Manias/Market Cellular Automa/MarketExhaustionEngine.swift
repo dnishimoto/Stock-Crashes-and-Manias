@@ -137,41 +137,7 @@ final class MarketExhaustionEngine: ObservableObject {
             )
         }
     }
-/*
-    // ========================================================
-    // MARK: - Historical CA Rows
-    // ========================================================
 
-    func historicalCARows() async -> [HistoricalCARow] {
-
-        var rows: [HistoricalCARow] = []
-
-        for period in historicalData.crashPeriods {
-
-            guard let analysis =
-                    await analyzeHistoricalCrash(at: period)
-            else {
-                continue
-            }
-
-            let historicalAnalysis = makeHistoricalAnalysis(
-                period: period,
-                result: analysis.result
-            )
-
-            rows.append(
-                HistoricalCARow(
-                    period: period,
-                    analysis: historicalAnalysis,
-                    result: analysis.result,
-                    cells: analysis.frames[analysis.frames.count-1].cells
-                )
-            )
-        }
-
-        return rows
-    }
-*/
     // ========================================================
     // MARK: - Analyze One Historical Crash
     // ========================================================
@@ -246,6 +212,7 @@ final class MarketExhaustionEngine: ObservableObject {
             isCrashYear: true,
             moneyEnergyChange: scenarioValue.moneySupplyChangePercent,
             volumePressure: volume,
+            scenario: scenarioValue,
             cells: finalCells
         )
 
@@ -296,6 +263,7 @@ final class MarketExhaustionEngine: ObservableObject {
                 isCrashYear: false,
                 moneyEnergyChange: scenarioValue.moneySupplyChangePercent,
                 volumePressure: volume,
+                scenario: scenarioValue,
                 cells: finalCells
             )
              
@@ -390,43 +358,8 @@ final class MarketExhaustionEngine: ObservableObject {
                 volumePressure: volumePressure,
                 cells: &caCells
             )
-/*
-            yearlyRiskHistory.append(
-                YearlyRiskSnapshot(
-                    year: iteration,
-                    equilibriumPressure:
-                        result.equilibriumPressure,
-                    volumePressure:
-                        result.volumePressure,
-                    systemicRisk:
-                        result.systemicRisk,
-                    meanEnergy:
-                        result.meanEnergy,
-                    meanMomentum:
-                        result.meanMomentum,
-                    meanExhaustion:
-                        result.meanExhaustion,
-                    meanStress:
-                        result.meanStress,
-                    meanFinancialPotential:
-                        result.meanFinancialPotential,
-                    criticalFraction:
-                        result.criticalFraction,
-                    crashFraction:
-                        result.crashFraction
-                )
 
-            )
- */
-/*
-            caDynamicsHistory.append(
-                makeCADynamicsSnapshot(
-                    year: iteration,
-                    systemicRisk: result.systemicRisk,
-                    cells: caCells
-                )
-            )
- */
+
         }
 
         result.cells = caCells
@@ -1246,6 +1179,8 @@ final class MarketExhaustionEngine: ObservableObject {
     ) -> MarketScenario {
 
         MarketScenario(
+            foreignInvestmentMillions:
+                year.foreignInvestmentMillions ?? 0.0,
             moneySupplyChangePercent:
                 year.m2GrowthPercent ?? 0.0,
 

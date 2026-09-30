@@ -22,6 +22,7 @@ struct CrashRecord: Identifiable {
 
 struct MarketScenario: Codable, Equatable {
 
+    var foreignInvestmentMillions : Double = 0.0
     // --------------------------------------------------------
     // Money / monetary policy
     // --------------------------------------------------------
@@ -99,6 +100,7 @@ struct MarketScenario: Codable, Equatable {
     // --------------------------------------------------------
 
     init(
+        foreignInvestmentMillions: Double = 0.0,
         moneySupplyChangePercent: Double = 0.0,
         inflationPercent: Double = 0.0,
         taxationGrowthPercent: Double = 0.0,
@@ -110,6 +112,7 @@ struct MarketScenario: Codable, Equatable {
         bankingCreditStressRating: Double = 0.0,
         moneyPolicyChangeImpact: Double = 0.0,
         externalShockMagnitudePercent: Double = 0.0
+
     ) {
         self.moneySupplyChangePercent =
             moneySupplyChangePercent
@@ -143,6 +146,9 @@ struct MarketScenario: Codable, Equatable {
 
         self.externalShockMagnitudePercent =
             externalShockMagnitudePercent
+        
+        self.foreignInvestmentMillions =
+            foreignInvestmentMillions
     }
 
     // --------------------------------------------------------
@@ -740,7 +746,7 @@ struct MarketParameters: Codable, Equatable {
     // --------------------------------------------------------
 
     var risingThreshold: Double = 0.25
-    var stressedThreshold: Double = 0.40 // Default: 0.40 (was 0.50)
+    var stressedThreshold: Double = 0.50
     var criticalThreshold: Double = 0.75
     var crashedThreshold: Double = 0.95
 
@@ -962,6 +968,8 @@ struct HistoricalYear: Codable, Identifiable {
     let stockGrowthPercent: Double?
 
     let stockVolumeMillions: Double?
+    
+    let foreignInvestmentMillions: Double?
 }
 
 
@@ -1017,6 +1025,7 @@ struct HistoricalCrashAnalysis:
 
     let year: Int
     let intervalYears: Int
+    
 
     let result: MarketRiskResult
 
@@ -1034,7 +1043,7 @@ struct HistoricalCrashAnalysis:
         year: Int,
         intervalYears: Int,
         result: MarketRiskResult,
-        frames: [HistoricalCAFrame] = []
+        frames: [HistoricalCAFrame] = [],
     ) {
         self.year = year
         self.intervalYears = intervalYears
@@ -1063,6 +1072,8 @@ struct HistoricalCAFrame:
     let moneyEnergyChange: Double
     let volumePressure: Double
 
+    let scenario: MarketScenario?
+    
     let cells: [MarketCell]
 }
 
@@ -1155,6 +1166,7 @@ struct HistoricalCAInput {
     //let totalExhaustion: Double
 }
 let historicalMarketJSON = """
+
 {
   "crashPeriods": [
     {
@@ -1171,7 +1183,8 @@ let historicalMarketJSON = """
         "taxGrowthPercent": 3.1,
         "economicGrowthPercent": -3.0,
         "stockGrowthPercent": -37.7,
-        "stockVolumeMillions": 150.0
+        "stockVolumeMillions": 150.0,
+        "foreignInvestmentMillions": 250.0
       },
       "priorYears": [
         {
@@ -1186,7 +1199,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 14.8,
           "economicGrowthPercent": 4.4,
           "stockGrowthPercent": -1.6,
-          "stockVolumeMillions": 137.8
+          "stockVolumeMillions": 137.8,
+          "foreignInvestmentMillions": 180.0
         },
         {
           "year": 1904,
@@ -1200,7 +1214,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 12.4,
           "economicGrowthPercent": -2.8,
           "stockGrowthPercent": 23.2,
-          "stockVolumeMillions": 157.7
+          "stockVolumeMillions": 157.7,
+          "foreignInvestmentMillions": 195.0
         },
         {
           "year": 1905,
@@ -1214,7 +1229,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 0.0,
           "economicGrowthPercent": 5.2,
           "stockGrowthPercent": 24.2,
-          "stockVolumeMillions": 210.0
+          "stockVolumeMillions": 210.0,
+          "foreignInvestmentMillions": 220.0
         },
         {
           "year": 1906,
@@ -1228,10 +1244,12 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 14.5,
           "economicGrowthPercent": 5.1,
           "stockGrowthPercent": 11.6,
-          "stockVolumeMillions": 230.4
+          "stockVolumeMillions": 230.4,
+          "foreignInvestmentMillions": 205.0
         }
       ]
     },
+
     {
       "crashYear": 1929,
       "currentYear": {
@@ -1246,7 +1264,8 @@ let historicalMarketJSON = """
         "taxGrowthPercent": 1.4,
         "economicGrowthPercent": -8.5,
         "stockGrowthPercent": -17.2,
-        "stockVolumeMillions": 920.0
+        "stockVolumeMillions": 920.0,
+        "foreignInvestmentMillions": 1800.0
       },
       "priorYears": [
         {
@@ -1261,7 +1280,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 5.1,
           "economicGrowthPercent": 4.7,
           "stockGrowthPercent": 37.2,
-          "stockVolumeMillions": 935.0
+          "stockVolumeMillions": 935.0,
+          "foreignInvestmentMillions": 2100.0
         },
         {
           "year": 1926,
@@ -1275,7 +1295,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 4.8,
           "economicGrowthPercent": 0.8,
           "stockGrowthPercent": 8.4,
-          "stockVolumeMillions": 1178.0
+          "stockVolumeMillions": 1178.0,
+          "foreignInvestmentMillions": 2300.0
         },
         {
           "year": 1927,
@@ -1289,7 +1310,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 0.8,
           "economicGrowthPercent": 1.9,
           "stockGrowthPercent": 19.9,
-          "stockVolumeMillions": 1408.0
+          "stockVolumeMillions": 1408.0,
+          "foreignInvestmentMillions": 2500.0
         },
         {
           "year": 1928,
@@ -1303,10 +1325,12 @@ let historicalMarketJSON = """
           "taxGrowthPercent": -3.0,
           "economicGrowthPercent": 4.9,
           "stockGrowthPercent": 43.6,
-          "stockVolumeMillions": 1693.0
+          "stockVolumeMillions": 1693.0,
+          "foreignInvestmentMillions": 2700.0
         }
       ]
     },
+
     {
       "crashYear": 1937,
       "currentYear": {
@@ -1321,7 +1345,8 @@ let historicalMarketJSON = """
         "taxGrowthPercent": 18.0,
         "economicGrowthPercent": -2.0,
         "stockGrowthPercent": -32.8,
-        "stockVolumeMillions": 350.0
+        "stockVolumeMillions": 350.0,
+        "foreignInvestmentMillions": 2600.0
       },
       "priorYears": [
         {
@@ -1336,7 +1361,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": -25.1,
           "economicGrowthPercent": -1.2,
           "stockGrowthPercent": 53.9,
-          "stockVolumeMillions": 476.0
+          "stockVolumeMillions": 476.0,
+          "foreignInvestmentMillions": 2200.0
         },
         {
           "year": 1934,
@@ -1350,7 +1376,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 49.8,
           "economicGrowthPercent": 10.8,
           "stockGrowthPercent": -1.4,
-          "stockVolumeMillions": 461.0
+          "stockVolumeMillions": 461.0,
+          "foreignInvestmentMillions": 2300.0
         },
         {
           "year": 1935,
@@ -1364,7 +1391,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 21.9,
           "economicGrowthPercent": 8.9,
           "stockGrowthPercent": 47.7,
-          "stockVolumeMillions": 519.0
+          "stockVolumeMillions": 519.0,
+          "foreignInvestmentMillions": 2450.0
         },
         {
           "year": 1936,
@@ -1378,10 +1406,12 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 8.3,
           "economicGrowthPercent": 12.9,
           "stockGrowthPercent": 33.9,
-          "stockVolumeMillions": 789.0
+          "stockVolumeMillions": 789.0,
+          "foreignInvestmentMillions": 2550.0
         }
       ]
     },
+
     {
       "crashYear": 1968,
       "currentYear": {
@@ -1396,7 +1426,8 @@ let historicalMarketJSON = """
         "taxGrowthPercent": 9.0,
         "economicGrowthPercent": 4.9,
         "stockGrowthPercent": 10.81,
-        "stockVolumeMillions": 720.0
+        "stockVolumeMillions": 720.0,
+        "foreignInvestmentMillions": 808.0
       },
       "priorYears": [
         {
@@ -1411,7 +1442,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 6.8,
           "economicGrowthPercent": 5.8,
           "stockGrowthPercent": 16.5,
-          "stockVolumeMillions": 1470.0
+          "stockVolumeMillions": 1470.0,
+          "foreignInvestmentMillions": 322.0
         },
         {
           "year": 1965,
@@ -1425,7 +1457,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 6.9,
           "economicGrowthPercent": 6.4,
           "stockGrowthPercent": 12.5,
-          "stockVolumeMillions": 1680.0
+          "stockVolumeMillions": 1680.0,
+          "foreignInvestmentMillions": 414.0
         },
         {
           "year": 1966,
@@ -1439,7 +1472,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 13.5,
           "economicGrowthPercent": 6.5,
           "stockGrowthPercent": -10.1,
-          "stockVolumeMillions": 1770.0
+          "stockVolumeMillions": 1770.0,
+          "foreignInvestmentMillions": 426.0
         },
         {
           "year": 1967,
@@ -1453,10 +1487,12 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 7.5,
           "economicGrowthPercent": 2.5,
           "stockGrowthPercent": 23.9,
-          "stockVolumeMillions": 2070.0
+          "stockVolumeMillions": 2070.0,
+          "foreignInvestmentMillions": 698.0
         }
       ]
     },
+
     {
       "crashYear": 1974,
       "currentYear": {
@@ -1471,7 +1507,8 @@ let historicalMarketJSON = """
         "taxGrowthPercent": 12.0,
         "economicGrowthPercent": -0.5,
         "stockGrowthPercent": -26.47,
-        "stockVolumeMillions": 3800.0
+        "stockVolumeMillions": 3800.0,
+        "foreignInvestmentMillions": 4761.0
       },
       "priorYears": [
         {
@@ -1486,7 +1523,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": -2.1,
           "economicGrowthPercent": 0.2,
           "stockGrowthPercent": 4.0,
-          "stockVolumeMillions": 3540.0
+          "stockVolumeMillions": 3540.0,
+          "foreignInvestmentMillions": 1464.0
         },
         {
           "year": 1971,
@@ -1500,7 +1538,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": -3.0,
           "economicGrowthPercent": 3.3,
           "stockGrowthPercent": 14.3,
-          "stockVolumeMillions": 3620.0
+          "stockVolumeMillions": 3620.0,
+          "foreignInvestmentMillions": 368.0
         },
         {
           "year": 1972,
@@ -1514,7 +1553,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 10.8,
           "economicGrowthPercent": 5.3,
           "stockGrowthPercent": 18.9,
-          "stockVolumeMillions": 4300.0
+          "stockVolumeMillions": 4300.0,
+          "foreignInvestmentMillions": 948.0
         },
         {
           "year": 1973,
@@ -1528,10 +1568,12 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 11.3,
           "economicGrowthPercent": 5.6,
           "stockGrowthPercent": -14.7,
-          "stockVolumeMillions": 4500.0
+          "stockVolumeMillions": 4500.0,
+          "foreignInvestmentMillions": 2800.0
         }
       ]
     },
+
     {
       "crashYear": 1987,
       "currentYear": {
@@ -1546,7 +1588,8 @@ let historicalMarketJSON = """
         "taxGrowthPercent": 10.3,
         "economicGrowthPercent": 3.5,
         "stockGrowthPercent": 6.46,
-        "stockVolumeMillions": 45800.0
+        "stockVolumeMillions": 45800.0,
+        "foreignInvestmentMillions": 58470.0
       },
       "priorYears": [
         {
@@ -1561,7 +1604,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 3.3,
           "economicGrowthPercent": 4.6,
           "stockGrowthPercent": 22.6,
-          "stockVolumeMillions": 11270.0
+          "stockVolumeMillions": 11270.0,
+          "foreignInvestmentMillions": 10371.0
         },
         {
           "year": 1984,
@@ -1575,7 +1619,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 11.0,
           "economicGrowthPercent": 7.2,
           "stockGrowthPercent": 6.3,
-          "stockVolumeMillions": 13660.0
+          "stockVolumeMillions": 13660.0,
+          "foreignInvestmentMillions": 24469.0
         },
         {
           "year": 1985,
@@ -1589,7 +1634,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 10.1,
           "economicGrowthPercent": 4.2,
           "stockGrowthPercent": 31.7,
-          "stockVolumeMillions": 17590.0
+          "stockVolumeMillions": 17590.0,
+          "foreignInvestmentMillions": 19747.0
         },
         {
           "year": 1986,
@@ -1603,10 +1649,12 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 4.8,
           "economicGrowthPercent": 3.5,
           "stockGrowthPercent": 18.4,
-          "stockVolumeMillions": 25100.0
+          "stockVolumeMillions": 25100.0,
+          "foreignInvestmentMillions": 35419.0
         }
       ]
     },
+
     {
       "crashYear": 2000,
       "currentYear": {
@@ -1621,7 +1669,8 @@ let historicalMarketJSON = """
         "taxGrowthPercent": 10.8,
         "economicGrowthPercent": 4.1,
         "stockGrowthPercent": -9.10,
-        "stockVolumeMillions": 310000.0
+        "stockVolumeMillions": 310000.0,
+        "foreignInvestmentMillions": 320337.0
       },
       "priorYears": [
         {
@@ -1636,7 +1685,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 10.2,
           "economicGrowthPercent": 3.8,
           "stockGrowthPercent": 23.0,
-          "stockVolumeMillions": 105460.0
+          "stockVolumeMillions": 105460.0,
+          "foreignInvestmentMillions": 86503.0
         },
         {
           "year": 1997,
@@ -1650,7 +1700,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 8.7,
           "economicGrowthPercent": 4.4,
           "stockGrowthPercent": 33.4,
-          "stockVolumeMillions": 134620.0
+          "stockVolumeMillions": 134620.0,
+          "foreignInvestmentMillions": 105602.0
         },
         {
           "year": 1998,
@@ -1664,7 +1715,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 9.0,
           "economicGrowthPercent": 4.5,
           "stockGrowthPercent": 28.6,
-          "stockVolumeMillions": 169320.0
+          "stockVolumeMillions": 169320.0,
+          "foreignInvestmentMillions": 179044.0
         },
         {
           "year": 1999,
@@ -1678,10 +1730,12 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 6.1,
           "economicGrowthPercent": 4.8,
           "stockGrowthPercent": 21.0,
-          "stockVolumeMillions": 203770.0
+          "stockVolumeMillions": 203770.0,
+          "foreignInvestmentMillions": 289104.0
         }
       ]
     },
+
     {
       "crashYear": 2008,
       "currentYear": {
@@ -1696,7 +1750,8 @@ let historicalMarketJSON = """
         "taxGrowthPercent": -2.0,
         "economicGrowthPercent": -0.1,
         "stockGrowthPercent": -38.49,
-        "stockVolumeMillions": 1060000.0
+        "stockVolumeMillions": 1060000.0,
+        "foreignInvestmentMillions": 318452.0
       },
       "priorYears": [
         {
@@ -1711,7 +1766,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": -5.7,
           "economicGrowthPercent": 3.9,
           "stockGrowthPercent": 10.9,
-          "stockVolumeMillions": 1099000.0
+          "stockVolumeMillions": 1099000.0,
+          "foreignInvestmentMillions": 151730.0
         },
         {
           "year": 2005,
@@ -1725,7 +1781,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 14.5,
           "economicGrowthPercent": 3.5,
           "stockGrowthPercent": 4.9,
-          "stockVolumeMillions": 1190000.0
+          "stockVolumeMillions": 1190000.0,
+          "foreignInvestmentMillions": 116656.0
         },
         {
           "year": 2006,
@@ -1739,7 +1796,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 11.8,
           "economicGrowthPercent": 2.8,
           "stockGrowthPercent": 15.8,
-          "stockVolumeMillions": 1328000.0
+          "stockVolumeMillions": 1328000.0,
+          "foreignInvestmentMillions": 247326.0
         },
         {
           "year": 2007,
@@ -1753,10 +1811,12 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 6.7,
           "economicGrowthPercent": 2.0,
           "stockGrowthPercent": 5.5,
-          "stockVolumeMillions": 1487000.0
+          "stockVolumeMillions": 1487000.0,
+          "foreignInvestmentMillions": 227714.0
         }
       ]
     },
+
     {
       "crashYear": 2020,
       "currentYear": {
@@ -1771,7 +1831,8 @@ let historicalMarketJSON = """
         "taxGrowthPercent": -1.0,
         "economicGrowthPercent": -2.2,
         "stockGrowthPercent": 18.40,
-        "stockVolumeMillions": 2450000.0
+        "stockVolumeMillions": 2450000.0,
+        "foreignInvestmentMillions": 111880.0
       },
       "priorYears": [
         {
@@ -1786,7 +1847,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 0.6,
           "economicGrowthPercent": 1.8,
           "stockGrowthPercent": 12.0,
-          "stockVolumeMillions": 3065000.0
+          "stockVolumeMillions": 3065000.0,
+          "foreignInvestmentMillions": 480016.0
         },
         {
           "year": 2017,
@@ -1800,7 +1862,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 1.5,
           "economicGrowthPercent": 2.5,
           "stockGrowthPercent": 21.8,
-          "stockVolumeMillions": 3071000.0
+          "stockVolumeMillions": 3071000.0,
+          "foreignInvestmentMillions": 325073.0
         },
         {
           "year": 2018,
@@ -1814,7 +1877,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 0.4,
           "economicGrowthPercent": 3.0,
           "stockGrowthPercent": -4.4,
-          "stockVolumeMillions": 3189000.0
+          "stockVolumeMillions": 3189000.0,
+          "foreignInvestmentMillions": 216415.0
         },
         {
           "year": 2019,
@@ -1828,10 +1892,12 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 4.0,
           "economicGrowthPercent": 2.6,
           "stockGrowthPercent": 31.5,
-          "stockVolumeMillions": 3304000.0
+          "stockVolumeMillions": 3304000.0,
+          "foreignInvestmentMillions": 256688.0
         }
       ]
     },
+
     {
       "crashYear": 2022,
       "currentYear": {
@@ -1846,7 +1912,8 @@ let historicalMarketJSON = """
         "taxGrowthPercent": 21.0,
         "economicGrowthPercent": 1.9,
         "stockGrowthPercent": -18.11,
-        "stockVolumeMillions": 2670000.0
+        "stockVolumeMillions": 2670000.0,
+        "foreignInvestmentMillions": 333874.0
       },
       "priorYears": [
         {
@@ -1861,7 +1928,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 0.4,
           "economicGrowthPercent": 3.0,
           "stockGrowthPercent": -4.4,
-          "stockVolumeMillions": 3189000.0
+          "stockVolumeMillions": 3189000.0,
+          "foreignInvestmentMillions": 216415.0
         },
         {
           "year": 2019,
@@ -1875,7 +1943,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 4.0,
           "economicGrowthPercent": 2.6,
           "stockGrowthPercent": 31.5,
-          "stockVolumeMillions": 3304000.0
+          "stockVolumeMillions": 3304000.0,
+          "foreignInvestmentMillions": 256688.0
         },
         {
           "year": 2020,
@@ -1889,7 +1958,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": -1.2,
           "economicGrowthPercent": -2.2,
           "stockGrowthPercent": 18.4,
-          "stockVolumeMillions": 4189000.0
+          "stockVolumeMillions": 4189000.0,
+          "foreignInvestmentMillions": 111880.0
         },
         {
           "year": 2021,
@@ -1903,10 +1973,12 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 18.3,
           "economicGrowthPercent": 5.8,
           "stockGrowthPercent": 28.7,
-          "stockVolumeMillions": 4646000.0
+          "stockVolumeMillions": 4646000.0,
+          "foreignInvestmentMillions": 405504.0
         }
       ]
     },
+
     {
       "crashYear": 2026,
       "currentYear": {
@@ -1921,7 +1993,8 @@ let historicalMarketJSON = """
         "taxGrowthPercent": 5.0,
         "economicGrowthPercent": 1.5,
         "stockGrowthPercent": 12.0,
-        "stockVolumeMillions": 5000000.0
+        "stockVolumeMillions": 5000000.0,
+        "foreignInvestmentMillions": 280000.0
       },
       "priorYears": [
         {
@@ -1936,7 +2009,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 21.0,
           "economicGrowthPercent": 1.9,
           "stockGrowthPercent": -18.11,
-          "stockVolumeMillions": 2670000.0
+          "stockVolumeMillions": 2670000.0,
+          "foreignInvestmentMillions": 333874.0
         },
         {
           "year": 2023,
@@ -1950,7 +2024,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": -9.4,
           "economicGrowthPercent": 2.9,
           "stockGrowthPercent": 26.29,
-          "stockVolumeMillions": 4670000.0
+          "stockVolumeMillions": 4670000.0,
+          "foreignInvestmentMillions": 287509.0
         },
         {
           "year": 2024,
@@ -1964,7 +2039,8 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 10.8,
           "economicGrowthPercent": 2.8,
           "stockGrowthPercent": 25.02,
-          "stockVolumeMillions": 5050000.0
+          "stockVolumeMillions": 5050000.0,
+          "foreignInvestmentMillions": 280589.0
         },
         {
           "year": 2025,
@@ -1978,12 +2054,14 @@ let historicalMarketJSON = """
           "taxGrowthPercent": 3.1,
           "economicGrowthPercent": 2.0,
           "stockGrowthPercent": 16.39,
-          "stockVolumeMillions": 5200000.0
+          "stockVolumeMillions": 5200000.0,
+          "foreignInvestmentMillions": 258689.0
         }
       ]
     }
   ]
 }
+
 """
 
 struct HistoricalSimulationResult: Identifiable {
@@ -1991,5 +2069,4 @@ struct HistoricalSimulationResult: Identifiable {
     let year: Int
     let result: MarketRiskResult
 }
-
 

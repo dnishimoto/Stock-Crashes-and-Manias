@@ -11,24 +11,7 @@ struct ContentView: View {
     
    @State private var currentYear = 2026
     
-    //@State private var currentCells : [MarketCell] = []
-    
 
-    // MARK: - 2026 / Current Scenario Inputs
-/*
-    @State private var growthM2 = 5.0
-    @State private var moneyPolicyChangeImpact = 0.62
-    @State private var bankingCreditStressRating = 2.0
-    @State private var inflationPercent = 3.0
-    @State private var taxGrowthPercent = 5.0
-    @State private var economicGrowthPercent = 3.0
-    @State private var stockGrowthPercent = 12.0
-    @State private var previousStockGrowthPercent = 20.0
-    @State private var bondYieldAvgPercent = 4.5
-    @State private var growthVolumePercent = 10.0
-    @State private var crashInterval = 6.0
-    @State private var externalShockPercent = 0.0
- */
     @State private var allYears: [Int] = []
 
     // MARK: - Engine
@@ -113,7 +96,7 @@ struct ContentView: View {
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
 
-                            Text("This will take about 30 seconds.")
+                            Text("This will take about 60 seconds.")
                                 .font(.subheadline.bold())
                                 .multilineTextAlignment(.center)
                         }
@@ -253,6 +236,8 @@ struct ContentView: View {
 
                 stateLegendView
                 Divider()
+                contagionCard(analysis:analysis)
+                scenarioCard(analysis: analysis)
                 riskCard(analysis: analysis)
             }
             .padding()
@@ -428,43 +413,6 @@ struct ContentView: View {
         )
     }
 
-    // MARK: - Information Card
-/*
-    private var currentInformationCard: some View {
-
-        VStack(
-            alignment: .leading,
-            spacing: 16
-        ) {
-
-            scenarioCard
-
-            if let result {
-
-                equilibriumCard(
-                    result
-                )
-
-                cellularAutomatonCard
-
-                localFinancialStructureCard
-
-                contagionCard
-
-                riskCard(
-                    result
-                )
-
-                dynamicsCard
-            }
-
-            modelPipelineCard(
-                year: selectedYear
-            )
-        }
-    }
- */
-
     // MARK: - Historical Information Card
 
     private func historicalYearInformationCard(
@@ -544,8 +492,10 @@ struct ContentView: View {
     }
 
     // MARK: - Scenario Card
-/*
-    private var scenarioCard: some View {
+
+    private func scenarioCard(
+        analysis: HistoricalCrashAnalysis
+    ) -> some View {
 
         VStack(
             alignment: .leading,
@@ -553,7 +503,7 @@ struct ContentView: View {
         ) {
 
             Text(
-                "\(selectedYear) Scenario"
+                "\(String(analysis.year)) Scenario"
             )
             .font(.headline)
 
@@ -568,75 +518,72 @@ struct ContentView: View {
 
             scenarioValue(
                 "M2 Growth",
-                value: growthM2,
+                value: analysis.frames.first?.scenario?.moneySupplyChangePercent ?? 0.0,
                 suffix: "%"
             )
 
             scenarioValue(
                 "Inflation",
-                value: inflationPercent,
+                value: analysis.frames.first?.scenario?.inflationPercent ?? 0.0,
                 suffix: "%"
             )
 
             scenarioValue(
-                "Tax Growth",
-                value: taxGrowthPercent,
-                suffix: "%"
+                "Money Policy Impact",
+                value: analysis.frames.last?.scenario?.moneyPolicyChangeImpact ?? 0.0,
+                suffix: ""
             )
 
             scenarioValue(
                 "Economic Growth",
-                value: economicGrowthPercent,
+                value: analysis.frames.first?.scenario?.economicGrowthPercent ?? 0.0,
                 suffix: "%"
             )
 
             scenarioValue(
                 "Stock Growth",
-                value: stockGrowthPercent,
+                value: analysis.frames.first?.scenario?.stockGrowthPercent ?? 0.0,
                 suffix: "%"
             )
 
             scenarioValue(
                 "Previous Stock Growth",
-                value: previousStockGrowthPercent,
+                value: analysis.frames.first?.scenario?.previousStockGrowthPercent ?? 0.0,
                 suffix: "%"
             )
 
             scenarioValue(
                 "Average Bond Yield",
-                value: bondYieldAvgPercent,
+                value: analysis.frames.first?.scenario?.bondYieldAvgPercent ?? 0.0,
                 suffix: "%"
             )
 
+
             scenarioValue(
-                "Volume Growth",
-                value: growthVolumePercent,
-                suffix: "%"
+                "Foreign Investment",
+                value: analysis.frames.first?.scenario?.foreignInvestmentMillions ?? 0.0,
+                suffix: "M"
             )
 
             scenarioValue(
                 "Bank / Credit Stress",
-                value: bankingCreditStressRating,
+                value: analysis.frames.first?.scenario?.bankingCreditStressRating ?? 0.0,
                 suffix: ""
             )
 
             scenarioValue(
                 "Policy Impact",
-                value: moneyPolicyChangeImpact,
+                value: analysis.frames.first?.scenario?.moneyPolicyChangeImpact ?? 0.0,
                 suffix: ""
             )
 
             scenarioValue(
                 "External Shock",
-                value: externalShockPercent,
+                value: analysis.frames.first?.scenario?.externalShockMagnitudePercent ?? 0.0,
                 suffix: "%"
             )
 
-            scenarioValue(
-                "Crash Interval",
-                value: crashInterval,
-                suffix: " years"
-            )
+            
         }
         .padding()
         .background(
@@ -646,7 +593,7 @@ struct ContentView: View {
             )
         )
     }
-*/
+
     // MARK: - Scenario Value
 
     private func scenarioValue(
@@ -911,7 +858,7 @@ struct ContentView: View {
             }
             
             contagionCard(analysis: analysis)
-            // Insert riskCard here using analysis (updated call site)
+            scenarioCard(analysis: analysis)
             riskCard(analysis: analysis)
         }
         .padding()
@@ -1033,6 +980,8 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Contagion
+  
     // MARK: - Contagion
     private func contagionCard(
         analysis: HistoricalCrashAnalysis
@@ -1794,52 +1743,9 @@ struct ContentView: View {
         )
     }
  */
-/*
-    private func runSimulation(
-        year: Int
-    ) {
-
-        let scenario =
-            scenarioForYear(
-                year
-            )
-
-        let equilibriumPressure =
-            min(
-                max(
-                    moneyPolicyChangeImpact,
-                    0.0
-                ),
-                1.0
-            )
-
-        let volumePressure =
-            min(
-                max(
-                    growthVolumePercent / 100.0,
-                    0.0
-                ),
-                1.0
-            )
-
-    
-        result = engine.runYear(
-            year:selectedYear,
-            caCells: &engine.cells,
-            iterations: 100,
-            equilibriumPressure:
-                equilibriumPressure,
-            volumePressure:
-                volumePressure,
-            scenario:
-                scenario
-        )
 
 
-    }
-*/
-    // MARK: - Scenario For Year
-/*
+ /*
     private func scenarioForYear(
         _ year: Int
     ) -> MarketScenario {
